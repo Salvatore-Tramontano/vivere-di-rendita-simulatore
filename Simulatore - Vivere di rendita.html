@@ -1,0 +1,1777 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vivere di Rendita: Il Simulatore</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { fintech: { dark: '#0f172a', card: '#1e293b' } } } }
+        }
+    </script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .glass-panel { background: rgba(30,41,59,0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 1rem; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+        /* ── Inputs ── */
+        input[type=number] { background-color: #0f172a; border: 1px solid #334155; color: #f8fafc; transition: all 0.3s; }
+        input[type=number]:disabled { background-color: #1e293b; border-color: #1e293b; cursor: not-allowed; color: #64748b; }
+        .focus-green:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 1px #10b981; }
+        .focus-blue:focus  { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
+
+        /* ── Info tooltip globale ── */
+        .info-icon { display: inline-block; cursor: help; color: #64748b; margin-left: 0.4rem; transition: color 0.3s; }
+        .info-icon:hover { color: #f8fafc; }
+        .info-tooltip { display: none !important; } /* Nasconde l'originale inline */
+        .info-tooltip-global {
+            position: fixed; z-index: 99999;
+            width: 320px; max-width: 90vw;
+            background-color: #1e293b; color: #cbd5e1; text-align: left;
+            border-radius: 0.5rem; padding: 0.875rem; 
+            font-size: 0.75rem; border: 1px solid #3b82f6; 
+            font-weight: normal; line-height: 1.55;
+            box-shadow: 0 20px 40px -8px rgba(0,0,0,0.95);
+            display: none; opacity: 0; transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        .info-tooltip-global.visible { opacity: 1; display: block; }
+        .info-tooltip-global::after {
+            content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+            border-width:5px; border-style:solid; border-color:#3b82f6 transparent transparent transparent;
+        }
+        .info-tooltip-global.tooltip-below::after { top: auto; bottom: 100%; border-color: transparent transparent #3b82f6 transparent; }
+        .info-tooltip-global.tooltip-left::after { left: 85%; }
+        .info-tooltip-global.tooltip-right::after { left: 15%; }
+
+        /* ── Toggles ── */
+        .toggle-checkbox:checked.toggle-green { right:0; border-color:#10b981; }
+        .toggle-checkbox:checked.toggle-green + .toggle-label { background-color:#10b981; }
+        .toggle-checkbox:checked.toggle-blue  { right:0; border-color:#3b82f6; }
+        .toggle-checkbox:checked.toggle-blue  + .toggle-label { background-color:#3b82f6; }
+        .toggle-checkbox { right:0; z-index:1; border-color:#cbd5e1; transition:all 0.3s; }
+        .toggle-label { background-color:#475569; transition:all 0.3s; }
+
+        /* ── Target card glow — calmo, non frenetico ── */
+        @keyframes glow-calm {
+            0%,100% { box-shadow: 0 0 12px rgba(59,130,246,0.15); }
+            50%      { box-shadow: 0 0 24px rgba(59,130,246,0.4); }
+        }
+        .target-card { animation: glow-calm 4s ease-in-out infinite; border: 1px solid rgba(59,130,246,0.5); }
+
+        .view-hidden { display: none !important; }
+
+        /* ── Badges ── */
+        .badge-optional {
+            font-size: 0.6rem; font-weight: 600; letter-spacing: 0.05em;
+            padding: 1px 6px; border-radius: 999px;
+            background: rgba(100,116,139,0.2); color: #94a3b8;
+            border: 1px solid #334155; text-transform: uppercase;
+        }
+
+        /* ── Sezioni collassabili ── */
+        .collapsible-content { overflow: hidden; transition: max-height 0.3s ease, opacity 0.3s ease; }
+        .collapsible-content.collapsed { max-height: 0 !important; opacity: 0; }
+        .collapse-chevron { transition: transform 0.3s ease; }
+        .collapse-chevron.open { transform: rotate(180deg); }
+
+        /* ── Campo tasse locked ── */
+        .tax-locked-overlay {
+            position: relative;
+        }
+        .tax-lock-btn {
+            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+            color: #64748b; cursor: pointer; font-size: 0.7rem;
+            transition: color 0.2s;
+        }
+        .tax-lock-btn:hover { color: #94a3b8; }
+
+        /* ── KPI alerts ── */
+        .kpi-warning { border-left: 3px solid #f59e0b; }
+        @keyframes pulse-red {
+            0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+            50%      { box-shadow: 0 0 0 3px rgba(239,68,68,0.25); }
+        }
+        .alert-banner { border-left: 3px solid #ef4444; animation: pulse-red 2.5s ease-in-out infinite; }
+
+        /* ── KPI flash feedback ── */
+        @keyframes kpi-flash {
+            0%   { opacity: 1; }
+            30%  { opacity: 0.35; }
+            100% { opacity: 1; }
+        }
+        .kpi-updated { animation: kpi-flash 0.35s ease-out; }
+
+        /* ── Selettore scenario pill-button ── */
+        .scenario-pill {
+            flex: 1; padding: 0.5rem 0.75rem; border-radius: 0.5rem;
+            font-size: 0.72rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s ease; border: 1px solid transparent;
+            text-align: center; display: flex; flex-direction: column;
+            align-items: center; gap: 0.25rem; background: transparent;
+            color: #64748b;
+        }
+        .scenario-pill:hover { color: #94a3b8; background: rgba(255,255,255,0.04); }
+        .scenario-pill.active-blue {
+            background: rgba(59,130,246,0.15); color: #93c5fd;
+            border-color: rgba(59,130,246,0.5);
+        }
+        .scenario-pill.active-green {
+            background: rgba(16,185,129,0.15); color: #6ee7b7;
+            border-color: rgba(16,185,129,0.5);
+        }
+        .scenario-pill .pill-icon { font-size: 1rem; margin-bottom: 1px; }
+        .scenario-pill .pill-label { letter-spacing: 0.02em; }
+        .scenario-pill .pill-sub { font-size: 0.6rem; font-weight: 400; color: inherit; opacity: 0.7; }
+
+        /* ── Mobile drawer ── */
+        @media (max-width: 1023px) {
+            .sidebar-panel {
+                position: fixed; top: 0; left: 0; height: 100dvh;
+                width: min(340px, 92vw);
+                transform: translateX(-110%);
+                transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+                z-index: 200; margin: 0; border-radius: 0;
+                border-right: 1px solid rgba(255,255,255,0.08);
+            }
+            .sidebar-panel.sidebar-open { transform: translateX(0); }
+            .sidebar-overlay {
+                display: none; position: fixed; inset: 0;
+                background: rgba(0,0,0,0.6); z-index: 199; backdrop-filter: blur(2px);
+            }
+            .sidebar-overlay.sidebar-open { display: block; }
+            .btn-sidebar-toggle { display: flex; }
+            .nav-label { display: none; }
+        }
+        @media (min-width: 1024px) {
+            .sidebar-panel { position: relative; transform: none !important; width: 21rem; height: 100%; flex-shrink: 0; }
+            .sidebar-overlay { display: none !important; }
+            .btn-sidebar-toggle { display: none; }
+            .nav-label { display: inline; }
+        }
+
+        /* ── Tooltip mobile removed (ora gestito globalmente) ── */
+
+        /* ── Onboarding modal ── */
+        #onboarding-modal {
+            position: fixed; inset: 0; z-index: 9000;
+            background: rgba(10,15,28,0.92); backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            padding: 1rem;
+        }
+        .onboarding-card {
+            cursor: pointer; transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+        .onboarding-card:hover { transform: translateY(-3px); }
+        .onboarding-card.blue:hover { border-color: #3b82f6; box-shadow: 0 0 24px rgba(59,130,246,0.3); }
+        .onboarding-card.green:hover { border-color: #10b981; box-shadow: 0 0 24px rgba(16,185,129,0.3); }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+<!-- ═══════════════════════════════════════ -->
+<!-- MODALE ONBOARDING                      -->
+<!-- ═══════════════════════════════════════ -->
+<div id="onboarding-modal">
+    <div class="max-w-2xl w-full">
+        <div class="text-center mb-8">
+            <div class="flex items-center justify-center gap-3 mb-4">
+                <i class="fa-solid fa-gem text-2xl text-slate-300"></i>
+                <h1 class="text-2xl font-bold text-white">Vivere di Rendita</h1>
+            </div>
+            <p class="text-slate-400 text-sm max-w-md mx-auto">
+                Questo simulatore calcola come gestire un grande capitale nel tempo, bilanciando prelievi mensili, tasse, inflazione e regali alle persone che ami.
+            </p>
+            <p class="text-slate-500 text-xs mt-2">Da dove vuoi partire?</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Scelta 1: Ho un obiettivo -->
+            <div class="onboarding-card blue glass-panel p-6 rounded-2xl" onclick="startApp('reverse')">
+                <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center mb-4">
+                    <i class="fa-solid fa-bullseye text-blue-400 text-xl"></i>
+                </div>
+                <h2 class="text-lg font-bold text-white mb-2">Ho un obiettivo di rendita</h2>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    So quanto voglio percepire ogni mese. Dimmi di quanti soldi ho bisogno in totale.
+                </p>
+                <div class="mt-4 flex items-center gap-2 text-blue-400 text-xs font-semibold">
+                    <span>Calcola il capitale necessario</span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                </div>
+            </div>
+
+            <!-- Scelta 2: Ho una cifra -->
+            <div class="onboarding-card green glass-panel p-6 rounded-2xl" onclick="startApp('direct')">
+                <div class="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
+                    <i class="fa-solid fa-piggy-bank text-emerald-400 text-xl"></i>
+                </div>
+                <h2 class="text-lg font-bold text-white mb-2">Ho già una cifra in mano</h2>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    So a quanto ammonta il capitale. Dimmi quanto posso prelevare ogni mese e per quanti anni durerà.
+                </p>
+                <div class="mt-4 flex items-center gap-2 text-emerald-400 text-xs font-semibold">
+                    <span>Calcola la rendita mensile</span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                </div>
+            </div>
+        </div>
+
+        <p class="text-center text-slate-600 text-xs mt-6">Potrai cambiare modalità in qualsiasi momento dalla barra in alto</p>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- TOP NAV                                -->
+<!-- ═══════════════════════════════════════ -->
+<header class="bg-slate-900 border-b border-slate-700 p-3 flex justify-between items-center z-10 gap-3">
+    <div class="flex items-center gap-3 min-w-0">
+        <button id="btn-hamburger" class="btn-sidebar-toggle items-center justify-center w-9 h-9 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-all flex-shrink-0" onclick="toggleSidebar()">
+            <i class="fa-solid fa-bars text-sm"></i>
+        </button>
+        <i class="fa-solid fa-gem text-lg text-slate-300 flex-shrink-0"></i>
+        <div class="min-w-0">
+            <h1 class="text-base md:text-xl font-bold text-white truncate">Vivere di Rendita</h1>
+            <p class="text-xs text-slate-500 mt-0.5 hidden md:block">Simula come gestire un grande capitale nel tempo</p>
+        </div>
+    </div>
+    <nav class="flex gap-2 flex-shrink-0 items-center">
+        <button id="btn-nav-reverse" onclick="switchView('reverse')"
+            class="px-3 md:px-5 py-2 rounded-full font-semibold transition-all duration-300 text-sm bg-blue-500/20 text-blue-400 border border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+            <i class="fa-solid fa-bullseye mr-1 md:mr-2"></i><span class="nav-label">Ho un obiettivo</span><span class="md:hidden text-xs">Obiettivo</span>
+        </button>
+        <button id="btn-nav-direct" onclick="switchView('direct')"
+            class="px-3 md:px-5 py-2 rounded-full font-semibold transition-all duration-300 text-sm text-slate-400 hover:text-white border border-transparent hover:border-slate-600">
+            <i class="fa-solid fa-piggy-bank mr-1 md:mr-2"></i><span class="nav-label">Ho una cifra</span><span class="md:hidden text-xs">Cifra</span>
+        </button>
+    </nav>
+</header>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- CONTAINER PRINCIPALE                   -->
+<!-- ═══════════════════════════════════════ -->
+<div class="flex-1 flex overflow-hidden relative">
+
+<div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- VIEW 1 — REVERSE (BLU)                 -->
+<!-- ═══════════════════════════════════════ -->
+<div id="view-reverse" class="w-full h-full flex absolute inset-0 bg-slate-900">
+
+    <aside id="sidebar-reverse" class="sidebar-panel glass-panel m-0 lg:m-4 flex flex-col overflow-y-auto border-t-4 border-t-blue-500">
+
+        <!-- Header sidebar mobile -->
+        <div class="lg:hidden flex justify-between items-center px-5 pt-4 pb-3 border-b border-slate-700/60 flex-shrink-0">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Parametri</span>
+            <button onclick="closeSidebar()" class="w-7 h-7 flex items-center justify-center rounded-full border border-slate-600 text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+        </div>
+
+        <div class="p-5 space-y-5 flex-1">
+
+            <!-- ① PERIODO -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-hourglass-half text-slate-500"></i> Per quanti anni
+                </h3>
+                <label class="block text-xs text-slate-400 mb-1">Durata della rendita (anni)</label>
+                <input type="number" id="rev_anni" value="30" min="1" max="150"
+                    class="w-full p-2.5 rounded-lg text-sm focus-blue"
+                    placeholder="es. 30" oninput="triggerRev()">
+                <p class="text-xs text-slate-600 mt-1">Il capitale si azzera esattamente alla fine di questo periodo.</p>
+            </div>
+
+            <!-- ② INVESTIMENTO -->
+            <div class="pt-4 border-t border-slate-700/60">
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line text-slate-500"></i> Come è investito il capitale
+                    <div class="info-icon"><i class="fa-solid fa-circle-info text-xs"></i><span class="info-tooltip">
+                        <strong class="text-white block mb-1">Rendimento atteso (%):</strong>
+                        La stima di rendimento lordo annuo del tuo portafoglio (es. azionario globale 7%, prudente 3%). Viene usato come tasso fisso medio.<br><br>
+                        <strong class="text-white block mb-1">Inflazione media (%):</strong>
+                        L'aumento del costo della vita. Se selezioni "Rata crescente", il tuo prelievo aumenterà ogni anno di questa percentuale per difendere il tuo potere d'acquisto reale.<br><br>
+                        <strong class="text-white block mb-1">Tassazione ETF Accumulazione:</strong>
+                        Il simulatore applica il regime fiscale italiano. A differenza di altri modelli, non paghi tasse finché non decidi di prelevare.<br><br>
+                        <strong class="text-slate-300 block mb-1">Gain Ratio (Quota di Plusvalenza):</strong>
+                        La tassa del 26% grava solo sulla frazione di portafoglio che rappresenta un guadagno puro. Se metà del tuo portafoglio è guadagno, il 26% viene calcolato solo su metà del prelievo mensile. Per questo motivo le trattenute fiscali partono molto basse (vicine a zero) e aumentano gradualmente nel tempo.<br><br>
+                        <strong class="text-slate-300 block mb-1">Imposta di bollo (0,2% annuo):</strong>
+                        Tassa statale annua sul conto titoli. È sottratta in automatico ogni mese.
+                    </span></div>
+                </h3>
+                <div class="flex gap-2 mb-3">
+                    <div class="flex-1 flex flex-col justify-end">
+                        <label class="block text-xs text-slate-400 mb-1">Rendimento annuo lordo (%)</label>
+                        <input type="number" id="rev_rendimento" value="4.0" step="0.1"
+                            class="w-full p-2.5 rounded-lg text-sm focus-blue"
+                            placeholder="es. 4.0" oninput="triggerRev()">
+                    </div>
+                    <div class="flex-1 flex flex-col justify-end">
+                        <label class="block text-xs text-slate-400 mb-1">Inflazione media (%)</label>
+                        <input type="number" id="rev_inflazione" value="2.0" step="0.1"
+                            class="w-full p-2.5 rounded-lg text-sm focus-blue"
+                            placeholder="es. 2.0" oninput="triggerRev()">
+                    </div>
+                </div>
+                <!-- Tasse con lock -->
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 flex items-center gap-1">
+                        Tasse sulle plusvalenze (%)
+                        <span id="rev_tasse_badge" class="badge-optional flex items-center gap-1"><i class="fa-solid fa-lock text-[9px]"></i> 26% Italia</span>
+                    </label>
+                    <div class="tax-locked-overlay">
+                        <input type="number" id="rev_tasse" value="26.0" min="0" max="100" step="0.1"
+                            class="w-full p-2.5 rounded-lg text-sm focus-blue pr-8"
+                            disabled oninput="triggerRev()">
+                        <span class="tax-lock-btn" onclick="toggleTasseLock('rev')" title="Modifica aliquota">
+                            <i id="rev_tasse_lock_icon" class="fa-solid fa-lock"></i>
+                        </span>
+                    </div>
+                </div>
+                <!-- Selettore scenario: Rata Fissa vs Crescente -->
+                <div class="mt-3">
+                    <label class="block text-xs text-slate-400 mb-2">Tipo di prelievo mensile</label>
+                    <div class="flex gap-2 bg-slate-900/60 p-1.5 rounded-xl border border-slate-700/60">
+                        <button id="rev_pill-fisso" onclick="setScenario('rev','fisso')"
+                            class="scenario-pill active-blue">
+                            <span class="pill-icon">→</span>
+                            <span class="pill-label">Rata fissa</span>
+                            <span class="pill-sub">stesso importo ogni mese</span>
+                        </button>
+                        <button id="rev_pill-cresc" onclick="setScenario('rev','cresc')"
+                            class="scenario-pill">
+                            <span class="pill-icon">↗</span>
+                            <span class="pill-label">Rata crescente</span>
+                            <span class="pill-sub">cresce con l'inflazione</span>
+                        </button>
+                    </div>
+                    <!-- input hidden che mantiene lo stato per i motori -->
+                    <input type="checkbox" id="rev_toggle-inflazione" class="hidden" onchange="triggerRev()">
+                </div>
+            </div>
+
+            <!-- ③ QUANTO VUOI — campo principale -->
+            <div class="pt-4 border-t border-slate-700/60">
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-wallet text-slate-500"></i> Quanto vuoi percepire ogni mese
+                </h3>
+                <label class="block text-xs text-blue-400 font-semibold mb-1">Il tuo bonifico mensile (€)</label>
+                <input type="number" id="rev_tuo_bonifico" value="5000" min="0"
+                    class="w-full p-2.5 rounded-lg text-sm focus-blue border-blue-900/50"
+                    placeholder="es. 5000" oninput="triggerRev()">
+                <p class="text-xs text-slate-600 mt-1">L'importo che accrediti a te stesso ogni mese.</p>
+            </div>
+
+            <!-- ④ VITALIZIARI MENSILI — collassabile opzionale -->
+            <div class="pt-4 border-t border-slate-700/60">
+                <button class="w-full flex items-center justify-between group" onclick="toggleSection('rev-vitaliziari')">
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-users text-slate-500"></i> Bonifici mensili ad altri
+                        <span class="badge-optional">Opzionale</span>
+                    </h3>
+                    <i id="rev-vitaliziari-chevron" class="fa-solid fa-chevron-down collapse-chevron open text-xs text-slate-600 group-hover:text-slate-400 transition-colors"></i>
+                </button>
+                <p class="text-xs text-slate-600 mt-1 mb-3">Persone a cui vuoi garantire una rendita fissa ogni mese (genitori, fratelli, partner).</p>
+                <div id="rev-vitaliziari-content" class="collapsible-content space-y-3" style="max-height: 300px;">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Gruppo 1 — contributo alto</label>
+                        <div class="flex gap-2">
+                            <div class="w-1/3">
+                                <label class="block text-xs text-slate-500 mb-1">Persone</label>
+                                <input type="number" id="rev_f1_num" value="0" min="0"
+                                    class="w-full p-2 rounded-lg text-sm focus-blue" placeholder="0" oninput="triggerRev()">
+                            </div>
+                            <div class="w-2/3">
+                                <label class="block text-xs text-slate-500 mb-1">€ / persona / mese</label>
+                                <input type="number" id="rev_f1_quota" value="0" min="0"
+                                    class="w-full p-2 rounded-lg text-sm focus-blue" placeholder="es. 800" oninput="triggerRev()">
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Gruppo 2 — contributo minore</label>
+                        <div class="flex gap-2">
+                            <div class="w-1/3">
+                                <label class="block text-xs text-slate-500 mb-1">Persone</label>
+                                <input type="number" id="rev_f2_num" value="0" min="0"
+                                    class="w-full p-2 rounded-lg text-sm focus-blue" placeholder="0" oninput="triggerRev()">
+                            </div>
+                            <div class="w-2/3">
+                                <label class="block text-xs text-slate-500 mb-1">€ / persona / mese</label>
+                                <input type="number" id="rev_f2_quota" value="0" min="0"
+                                    class="w-full p-2 rounded-lg text-sm focus-blue" placeholder="es. 300" oninput="triggerRev()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑤ REGALI IMMEDIATI — collassabile opzionale -->
+            <div class="pt-4 border-t border-slate-700/60">
+                <button class="w-full flex items-center justify-between group" onclick="toggleSection('rev-regali')">
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-gift text-slate-500"></i> Regali e donazioni subito
+                        <span class="badge-optional">Opzionale</span>
+                    </h3>
+                    <i id="rev-regali-chevron" class="fa-solid fa-chevron-down collapse-chevron open text-xs text-slate-600 group-hover:text-slate-400 transition-colors"></i>
+                </button>
+                <p class="text-xs text-slate-600 mt-1 mb-3">Importi che vuoi erogare subito il Giorno Zero, prima di investire (acquisto casa per un figlio, estinzione mutuo di un amico, ecc.).</p>
+                <div id="rev-regali-content" class="collapsible-content space-y-3" style="max-height: 300px;">
+                    <div>
+                        <label class="block text-xs text-purple-400 font-semibold mb-1">Beneficenza (% sulla somma totale)</label>
+                        <input type="number" id="rev_beneficenza_perc" value="0" min="0" max="99" step="0.5"
+                            class="w-full p-2.5 rounded-lg text-sm focus-blue"
+                            placeholder="es. 5" oninput="triggerRev()">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Regali una tantum a singole persone</label>
+                        <div class="flex gap-2">
+                            <div class="w-1/3">
+                                <label class="block text-xs text-slate-500 mb-1">Persone</label>
+                                <input type="number" id="rev_f3_num" value="0" min="0"
+                                    class="w-full p-2 rounded-lg text-sm focus-blue" placeholder="0" oninput="triggerRev()">
+                            </div>
+                            <div class="w-2/3">
+                                <label class="block text-xs text-slate-500 mb-1">€ a persona (fisso)</label>
+                                <input type="number" id="rev_f3_quota" value="0" min="0"
+                                    class="w-full p-2 rounded-lg text-sm focus-blue" placeholder="es. 50000" oninput="triggerRev()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /p-5 -->
+
+        <!-- Footer sidebar: reset -->
+        <div class="px-5 py-3 border-t border-slate-700/60 flex-shrink-0">
+            <button onclick="resetView('reverse')" class="w-full flex items-center justify-center gap-2 text-xs text-slate-500 hover:text-slate-300 py-2 rounded-lg hover:bg-slate-800/50 transition-all">
+                <i class="fa-solid fa-rotate-left text-xs"></i> Ripristina valori iniziali
+            </button>
+        </div>
+
+    </aside>
+
+    <!-- ── Main Reverse ── -->
+    <main class="flex-1 p-4 overflow-y-auto">
+
+        <!-- KPI PRINCIPALE TARGET -->
+        <div class="glass-panel p-6 mb-4 target-card bg-slate-800/60 text-center">
+            <p class="text-xs text-blue-300 uppercase tracking-widest font-semibold mb-2">Capitale Totale Necessario</p>
+            <h1 class="text-4xl md:text-5xl font-black text-white tracking-tight" id="rev_kpi-target">€ –</h1>
+            <p class="text-xs text-slate-500 mt-3 max-w-xl mx-auto" id="rev_kpi-target-sub">
+                Imposta i parametri nella barra laterale per calcolare il tuo obiettivo.
+            </p>
+        </div>
+
+        <!-- RIEPILOGO NARRATIVO in cima -->
+        <div id="rev_riepilogo" class="glass-panel px-5 py-4 mb-4 border-l-4 border-blue-500/50 hidden">
+            <p id="rev_riepilogo-testo" class="text-sm text-slate-300 leading-relaxed"></p>
+        </div>
+
+        <!-- KPI SECONDARI -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div class="glass-panel p-4 relative">
+                <p class="text-xs text-slate-400">Capitale da Investire</p>
+                <h2 class="text-xl font-bold text-white mt-1" id="rev_kpi-investimento">€ –</h2>
+                <p class="text-xs text-slate-600 mt-0.5">Dopo donazioni Giorno Zero</p>
+                <div class="info-icon absolute top-3 right-3 text-xs"><i class="fa-solid fa-circle-info"></i><span class="info-tooltip">
+                    La somma che entra effettivamente nel conto d'investimento, dopo aver sottratto dal totale tutte le uscite del "Giorno Zero" (donazioni, beneficenza, regali). Solo questa cifra cresce nel tempo grazie agli interessi.
+                </span></div>
+            </div>
+            <div class="glass-panel p-4 border-l-4 border-purple-500 relative">
+                <p class="text-xs text-slate-400">Uscite Giorno Zero</p>
+                <h2 class="text-xl font-bold text-purple-400 mt-1" id="rev_kpi-uscite">€ –</h2>
+                <p class="text-xs text-slate-600 mt-0.5">Beneficenza + regali</p>
+                <div class="info-icon absolute top-3 right-3 text-xs"><i class="fa-solid fa-circle-info"></i><span class="info-tooltip">
+                    Spese e donazioni immediate effettuate prima ancora di investire. Trattandosi di uscite istantanee, questi fondi non produrranno mai un ritorno economico nella simulazione.
+                </span></div>
+            </div>
+            <div class="glass-panel p-4 relative">
+                <p class="text-xs text-slate-400">Primo Prelievo (Mese 1)</p>
+                <h2 class="text-xl font-bold text-white mt-1" id="rev_kpi-costo-mese">€ –</h2>
+                <p class="text-xs text-slate-600 mt-0.5" id="rev_kpi-rata-tipo">Tu + altri</p>
+            </div>
+            <div class="glass-panel p-4 relative">
+                <p class="text-xs text-slate-400">Oneri Fiscali Totali</p>
+                <h2 class="text-xl font-bold text-red-400 mt-1" id="rev_kpi-tasse-totali">€ –</h2>
+                <p class="text-xs text-slate-600 mt-0.5" id="rev_kpi-tasse-desc">Plusvalenze + bollo</p>
+                <div class="info-icon absolute top-3 right-3 text-xs"><i class="fa-solid fa-circle-info"></i><span class="info-tooltip">
+                    Tutto ciò che pagherai al fisco nell'intero periodo della simulazione, diviso in due voci:<br><br>
+                    <strong class="text-slate-300 block mt-1">Tasse sui guadagni (26%):</strong> Si pagano solo quando prelevi. L'importo parte basso e cresce negli anni, man mano che il tuo portafoglio vale di più rispetto a quanto hai investito.<br>
+                    <strong class="text-slate-300 block mt-1">Imposta di bollo (0,2% annuo):</strong> Una tassa fissa sul possesso del conto titoli, sottratta automaticamente ogni mese.<br><br>
+                    I bonifici mostrati in simulazione sono già al netto: queste tasse sono incluse nel calcolo.
+                </span></div>
+            </div>
+        </div>
+
+        <!-- BANNER POTERE D'ACQUISTO -->
+        <div id="rev_kpi-potere-row" class="glass-panel px-4 py-3 mb-4 kpi-warning hidden">
+            <p class="text-xs text-amber-400 font-semibold flex items-center gap-1 mb-1">
+                <i class="fa-solid fa-triangle-exclamation"></i> Attenzione: erosione del potere d'acquisto
+            </p>
+            <p class="text-xs text-slate-400">
+                Con inflazione al <span id="rev_txt-inf-pa" class="text-white font-bold">2%</span> e rata fissa,
+                i tuoi <span id="rev_txt-rata-nom" class="text-white font-bold">€ 0</span> mensili varranno in termini reali
+                <span id="rev_txt-rata-reale" class="text-amber-300 font-bold">€ 0</span> all'anno <span id="rev_txt-anni-pa" class="text-white font-bold">0</span>
+                (−<span id="rev_txt-erosione" class="text-red-400 font-bold">0%</span>).
+                Attiva <strong class="text-blue-300">Adegua all'inflazione</strong> per proteggerti.
+            </p>
+        </div>
+
+        <!-- BANNER PARAMETRI IMPOSSIBILI -->
+        <div id="rev_banner-impossibile" class="glass-panel px-4 py-3 mb-4 alert-banner hidden">
+            <p class="text-xs text-red-400 font-semibold flex items-center gap-2 mb-1">
+                <i class="fa-solid fa-circle-xmark"></i> Il capitale si esaurisce prima del previsto
+            </p>
+            <p class="text-xs text-slate-300">
+                Con questi parametri il capitale si azzera all'<strong class="text-red-300">Anno <span id="rev_txt-durata-reale">–</span></strong>
+                invece che all'Anno <span id="rev_txt-durata-target-r" class="text-white font-bold">–</span>.
+                Il prelievo mensile totale (<span id="rev_txt-pmt-impossibile" class="text-white font-bold">–</span>) è troppo alto rispetto a quanto il capitale riesce a generare.
+            </p>
+        </div>
+
+        <!-- GRAFICO -->
+        <div class="glass-panel p-5">
+            <div class="flex items-center justify-between mb-1">
+                <h3 class="text-sm font-semibold text-slate-200">Come scende il capitale nel tempo</h3>
+                <div class="info-icon text-xs"><i class="fa-solid fa-circle-info"></i><span class="info-tooltip">
+                    La curva mostra come il tuo capitale si consuma anno dopo anno. Ogni mese vengono sottratti il tuo bonifico mensile e le tasse allo Stato (imposta di bollo e tasse sui guadagni realizzati).<br><br>
+                    <strong class="text-slate-300">Passa il cursore sul grafico</strong> per vedere ogni anno: quanto rimane nel conto, l'importo esatto del bonifico e quanto trattiene il fisco.
+                </span></div>
+            </div>
+            <p class="text-xs text-slate-600 mb-3">Azzeramento previsto all'Anno <span id="rev_txt-anni-grafico" class="text-blue-400 font-semibold">–</span></p>
+            <div class="h-64 relative"><canvas id="rev_mainChart"></canvas></div>
+        </div>
+
+    </main>
+</div><!-- /view-reverse -->
+
+
+<!-- ═══════════════════════════════════════ -->
+<!-- VIEW 2 — DIRECT (VERDE)                -->
+<!-- ═══════════════════════════════════════ -->
+<div id="view-direct" class="view-hidden w-full h-full flex absolute inset-0 bg-slate-900">
+
+    <aside id="sidebar-direct" class="sidebar-panel glass-panel m-0 lg:m-4 flex flex-col overflow-y-auto border-t-4 border-t-emerald-500">
+
+        <div class="lg:hidden flex justify-between items-center px-5 pt-4 pb-3 border-b border-slate-700/60 flex-shrink-0">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Parametri</span>
+            <button onclick="closeSidebar()" class="w-7 h-7 flex items-center justify-center rounded-full border border-slate-600 text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+        </div>
+
+        <div class="p-5 space-y-5 flex-1">
+
+            <!-- ① CAPITALE + PERIODO -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-piggy-bank text-slate-500"></i> Il tuo capitale
+                </h3>
+                <label class="block text-xs text-emerald-400 font-semibold mb-1">Capitale iniziale totale (€)</label>
+                <input type="number" id="dir_vincita" value="1000000" min="0"
+                    class="w-full p-2.5 rounded-lg text-sm focus-green"
+                    placeholder="es. 1000000" oninput="triggerDir()">
+                <label class="block text-xs text-slate-400 mb-1 mt-3">Per quanti anni deve durare</label>
+                <input type="number" id="dir_anni" value="30" min="1" max="150"
+                    class="w-full p-2.5 rounded-lg text-sm focus-green"
+                    placeholder="es. 30" oninput="triggerDir()">
+            </div>
+
+            <!-- ② INVESTIMENTO -->
+            <div class="pt-4 border-t border-slate-700/60">
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line text-slate-500"></i> Come è investito
+                    <div class="info-icon"><i class="fa-solid fa-circle-info text-xs"></i><span class="info-tooltip">
+                        <strong class="text-white block mb-1">Rendimento atteso (%):</strong>
+                        La stima di rendimento lordo annuo del portafoglio (es. azionario 7%, prudente 3%).<br><br>
+                        <strong class="text-white block mb-1">Inflazione media (%):</strong>
+                        L'aumento nel costo della vita. Se scegli "Rata crescente", il prelievo indicato crescerà fedelmente ogni anno per annullare l'inflazione.<br><br>
+                        <strong class="text-white block mb-1">Tassazione ETF Accumulazione:</strong>
+                        Viene rigorosamente simulato il regime del risparmio amministrato italiano. Le plusvalenze passate non sono tassate finché non prelevi.<br><br>
+                        <strong class="text-slate-300 block mb-1">Gain Ratio (Quota di Plusvalenza):</strong>
+                        Il 26% di ritenuta si applica SOLO sulla percentuale del prelievo che costituisce un vero profitto. Ad esempio, se prelevi 1000€ e solo il 10% del tuo intero capitale è frutto di guadagni latenti, pagherai il 26% calcolato solo su quei 100€ (quindi pagherai circa 26€ e in tasca ti resteranno 974€ esenti).<br><br>
+                        <strong class="text-slate-300 block mb-1">Imposta di bollo (0,2%):</strong>
+                        Tassa patrimoniale annua. Dedotta e scontata automaticamente nei calcoli.
+                    </span></div>
+                </h3>
+                <div class="flex gap-2 mb-3">
+                    <div class="flex-1 flex flex-col justify-end">
+                        <label class="block text-xs text-slate-400 mb-1">Rendimento lordo (%)</label>
+                        <input type="number" id="dir_rendimento" value="4.0" step="0.1"
+                            class="w-full p-2.5 rounded-lg text-sm focus-green"
+                            placeholder="es. 4.0" oninput="triggerDir()">
+                    </div>
+                    <div class="flex-1 flex flex-col justify-end">
+                        <label class="block text-xs text-slate-400 mb-1">Inflazione media (%)</label>
+                        <input type="number" id="dir_inflazione" value="2.0" step="0.1"
+                            class="w-full p-2.5 rounded-lg text-sm focus-green"
+                            placeholder="es. 2.0" oninput="triggerDir()">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 flex items-center gap-1">
+                        Tasse sulle plusvalenze (%)
+                        <span id="dir_tasse_badge" class="badge-optional flex items-center gap-1"><i class="fa-solid fa-lock text-[9px]"></i> 26% Italia</span>
+                    </label>
+                    <div class="tax-locked-overlay">
+                        <input type="number" id="dir_tasse" value="26.0" min="0" max="100" step="0.1"
+                            class="w-full p-2.5 rounded-lg text-sm focus-green pr-8"
+                            disabled oninput="triggerDir()">
+                        <span class="tax-lock-btn" onclick="toggleTasseLock('dir')" title="Modifica aliquota">
+                            <i id="dir_tasse_lock_icon" class="fa-solid fa-lock"></i>
+                        </span>
+                    </div>
+                </div>
+                <!-- Selettore scenario: Rata Fissa vs Crescente -->
+                <div class="mt-3">
+                    <label class="block text-xs text-slate-400 mb-2">Tipo di prelievo mensile</label>
+                    <div class="flex gap-2 bg-slate-900/60 p-1.5 rounded-xl border border-slate-700/60">
+                        <button id="dir_pill-fisso" onclick="setScenario('dir','fisso')"
+                            class="scenario-pill active-green">
+                            <span class="pill-icon">→</span>
+                            <span class="pill-label">Rata fissa</span>
+                            <span class="pill-sub">stesso importo ogni mese</span>
+                        </button>
+                        <button id="dir_pill-cresc" onclick="setScenario('dir','cresc')"
+                            class="scenario-pill">
+                            <span class="pill-icon">↗</span>
+                            <span class="pill-label">Rata crescente</span>
+                            <span class="pill-sub">cresce con l'inflazione</span>
+                        </button>
+                    </div>
+                    <input type="checkbox" id="dir_toggle-inflazione" class="hidden" onchange="triggerDir()">
+                </div>
+            </div>
+
+            <!-- ③ DONAZIONI SUBITO — collassabile -->
+            <div class="pt-4 border-t border-slate-700/60">
+                <button class="w-full flex items-center justify-between group" onclick="toggleSection('dir-regali')">
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-gift text-slate-500"></i> Donazioni immediate
+                        <span class="badge-optional">Opzionale</span>
+                    </h3>
+                    <i id="dir-regali-chevron" class="fa-solid fa-chevron-down collapse-chevron open text-xs text-slate-600 group-hover:text-slate-400 transition-colors"></i>
+                </button>
+                <p class="text-xs text-slate-600 mt-1 mb-3">Quanto vuoi erogare subito il Giorno Zero, prima di investire il resto.</p>
+                <div id="dir-regali-content" class="collapsible-content space-y-3" style="max-height: 300px;">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Beneficenza (% del capitale)</label>
+                        <input type="number" id="dir_beneficenza" value="0" min="0" max="99" step="0.5"
+                            class="w-full p-2.5 rounded-lg text-sm focus-green"
+                            placeholder="es. 5" oninput="triggerDir()">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5">Regali una tantum a persone care</label>
+                        <div class="flex gap-2">
+                            <div class="w-1/2">
+                                <label class="block text-xs text-slate-500 mb-1">N° persone</label>
+                                <input type="number" id="dir_f3_num" value="0" min="0"
+                                    class="w-full p-2 rounded-lg text-sm focus-green" placeholder="0" oninput="triggerDir()">
+                            </div>
+                            <div class="w-1/2">
+                                <label class="block text-xs text-slate-500 mb-1">% del capitale ciascuno</label>
+                                <input type="number" id="dir_f3_perc" value="0" min="0" step="0.1"
+                                    class="w-full p-2 rounded-lg text-sm focus-green" placeholder="es. 5" oninput="triggerDir()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ④ DISTRIBUZIONE MENSILE — collassabile -->
+            <div class="pt-4 border-t border-slate-700/60">
+                <button class="w-full flex items-center justify-between group" onclick="toggleSection('dir-split')">
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-users text-slate-500"></i> Distribuisci il prelievo
+                        <span class="badge-optional">Opzionale</span>
+                    </h3>
+                    <i id="dir-split-chevron" class="fa-solid fa-chevron-down collapse-chevron open text-xs text-slate-600 group-hover:text-slate-400 transition-colors"></i>
+                </button>
+                <p class="text-xs text-slate-600 mt-1 mb-3">Decide che percentuale del prelievo mensile destinare ad altri. Il resto va a te.</p>
+                <div id="dir-split-content" class="collapsible-content space-y-3" style="max-height: 300px;">
+                    <!-- Barra split -->
+                    <div class="w-full bg-slate-700 rounded-full h-2 flex overflow-hidden">
+                        <div id="dir_bar-f1"  class="bg-blue-500 h-2 transition-all" style="width:0%"></div>
+                        <div id="dir_bar-f2"  class="bg-purple-500 h-2 transition-all" style="width:0%"></div>
+                        <div id="dir_bar-tuo" class="bg-emerald-500 h-2 transition-all" style="width:100%"></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="w-1/3">
+                            <label class="block text-xs text-slate-500 mb-1">Gr.1 (pers.)</label>
+                            <input type="number" id="dir_f1_num" value="0" min="0"
+                                class="w-full p-2 rounded-lg text-sm focus-green" placeholder="0" oninput="triggerDir()">
+                        </div>
+                        <div class="w-2/3">
+                            <label class="block text-xs text-slate-500 mb-1">% del totale mensile</label>
+                            <input type="number" id="dir_f1_perc" value="0" min="0"
+                                class="w-full p-2 rounded-lg text-sm focus-green" placeholder="es. 20" oninput="triggerDir()">
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="w-1/3">
+                            <label class="block text-xs text-slate-500 mb-1">Gr.2 (pers.)</label>
+                            <input type="number" id="dir_f2_num" value="0" min="0"
+                                class="w-full p-2 rounded-lg text-sm focus-green" placeholder="0" oninput="triggerDir()">
+                        </div>
+                        <div class="w-2/3">
+                            <label class="block text-xs text-slate-500 mb-1">% del totale mensile</label>
+                            <input type="number" id="dir_f2_perc" value="0" min="0"
+                                class="w-full p-2 rounded-lg text-sm focus-green" placeholder="es. 10" oninput="triggerDir()">
+                        </div>
+                    </div>
+                    <div class="bg-slate-800/60 rounded-lg px-3 py-2 flex justify-between items-center">
+                        <span class="text-xs text-emerald-400 font-semibold">La tua quota (auto)</span>
+                        <input type="number" id="dir_quota_tua" value="100" disabled
+                            class="w-20 p-1 rounded text-xs font-bold text-emerald-400 text-right">
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /p-5 -->
+
+        <div class="px-5 py-3 border-t border-slate-700/60 flex-shrink-0">
+            <button onclick="resetView('direct')" class="w-full flex items-center justify-center gap-2 text-xs text-slate-500 hover:text-slate-300 py-2 rounded-lg hover:bg-slate-800/50 transition-all">
+                <i class="fa-solid fa-rotate-left text-xs"></i> Ripristina valori iniziali
+            </button>
+        </div>
+
+    </aside>
+
+    <!-- ── Main Direct ── -->
+    <main class="flex-1 p-4 overflow-y-auto">
+
+        <!-- KPI PRINCIPALE -->
+        <div class="glass-panel p-6 mb-4 bg-slate-800/60 border border-emerald-500/30">
+            <p class="text-xs text-emerald-300 uppercase tracking-widest font-semibold mb-1">Primo Prelievo (Mese 1)</p>
+            <div class="flex items-baseline gap-3 flex-wrap">
+                <h1 class="text-4xl md:text-5xl font-black text-white tracking-tight" id="dir_kpi-rata">€ –</h1>
+                <span class="text-sm text-slate-400 font-medium" id="dir_kpi-rata-tipo">–</span>
+            </div>
+        </div>
+
+        <!-- BANNER POTERE D'ACQUISTO Direct (visibile solo con rata fissa + inflazione) -->
+        <div id="dir_kpi-potere-row" class="glass-panel px-4 py-3 mb-4 kpi-warning hidden">
+            <p class="text-xs text-amber-400 font-semibold flex items-center gap-1 mb-1">
+                <i class="fa-solid fa-triangle-exclamation"></i> Attenzione: erosione del potere d'acquisto
+            </p>
+            <p class="text-xs text-slate-400">
+                Con inflazione al <span id="dir_txt-inf-pa" class="text-white font-bold">2%</span> e rata fissa,
+                i tuoi <span id="dir_txt-rata-nom" class="text-white font-bold">€ 0</span> mensili varranno in termini reali
+                <span id="dir_txt-rata-reale" class="text-amber-300 font-bold">€ 0</span> all'anno <span id="dir_txt-anni-pa" class="text-white font-bold">0</span>
+                (−<span id="dir_txt-erosione" class="text-red-400 font-bold">0%</span>).
+                Attiva <strong class="text-emerald-300">Adegua all'inflazione</strong> per proteggerti.
+            </p>
+        </div>
+
+        <!-- RIEPILOGO NARRATIVO in cima -->
+        <div id="dir_riepilogo" class="glass-panel px-5 py-4 mb-4 border-l-4 border-emerald-500/50 hidden">
+            <p id="dir_riepilogo-testo" class="text-sm text-slate-300 leading-relaxed"></p>
+        </div>
+
+        <!-- KPI SECONDARI -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div class="glass-panel p-4 relative">
+                <p class="text-xs text-slate-400">Capitale da Investire</p>
+                <h2 class="text-xl font-bold text-white mt-1" id="dir_kpi-capitale">€ –</h2>
+                <p class="text-xs text-slate-600 mt-0.5">Dopo donazioni</p>
+                <div class="info-icon absolute top-3 right-3 text-xs"><i class="fa-solid fa-circle-info"></i><span class="info-tooltip">La somma che entra effettivamente nel conto d'investimento, dopo aver sottratto tutte le uscite del Giorno Zero (donazioni, beneficenza, regali). Solo questa cifra cresce nel tempo grazie agli interessi.</span></div>
+            </div>
+            <div class="glass-panel p-4 relative">
+                <p class="text-xs text-slate-400">Il Tuo Bonifico</p>
+                <h2 class="text-xl font-bold text-white mt-1" id="dir_kpi-tuo">€ –</h2>
+                <p class="text-xs text-slate-600 mt-0.5">La tua quota personale</p>
+            </div>
+            <div class="glass-panel p-4 relative">
+                <p class="text-xs text-slate-400">Oneri Fiscali Totali</p>
+                <h2 class="text-xl font-bold text-red-400 mt-1" id="dir_kpi-tasse-totali">€ –</h2>
+                <p class="text-xs text-slate-600 mt-0.5" id="dir_kpi-tasse-perc">Plusvalenze + bollo</p>
+                <div class="info-icon absolute top-3 right-3 text-xs"><i class="fa-solid fa-circle-info"></i><span class="info-tooltip">Tutto ciò che pagherai al fisco nell'intero periodo della simulazione, diviso in due voci:<br><br><strong class="text-slate-300 block mt-1">Tasse sui guadagni (26%):</strong> Si pagano solo quando prelevi. L'importo parte basso e cresce negli anni, man mano che il tuo portafoglio vale di più rispetto a quanto hai investito.<br><br><strong class="text-slate-300 block mt-1">Imposta di bollo (0,2% annuo):</strong> Una tassa fissa sul possesso del conto titoli, sottratta automaticamente ogni mese.</span></div>
+            </div>
+            <div class="glass-panel p-4 border-l-4 border-purple-500 relative">
+                <p class="text-xs text-slate-400">Uscite Giorno Zero</p>
+                <h2 class="text-xl font-bold text-purple-400 mt-1" id="dir_kpi-uscite-zero">€ –</h2>
+                <p class="text-xs text-slate-600 mt-0.5">Beneficenza + regali</p>
+            </div>
+        </div>
+
+        <!-- BANNER PARAMETRI IMPOSSIBILI -->
+        <div id="dir_banner-impossibile" class="glass-panel px-4 py-3 mb-4 alert-banner hidden">
+            <p class="text-xs text-red-400 font-semibold flex items-center gap-2 mb-1">
+                <i class="fa-solid fa-circle-xmark"></i> Il capitale si esaurisce prima del previsto
+            </p>
+            <p class="text-xs text-slate-300">
+                Con questi parametri il capitale si azzera all'<strong class="text-red-300">Anno <span id="dir_txt-durata-reale">–</span></strong>
+                invece che all'Anno <span id="dir_txt-durata-target" class="text-white font-bold">–</span>.
+            </p>
+        </div>
+
+        <!-- GRAFICO -->
+        <div class="glass-panel p-5 mb-4">
+            <div class="flex items-center justify-between mb-1">
+                <h3 class="text-sm font-semibold text-slate-200">Come scende il capitale nel tempo</h3>
+                <div class="info-icon text-xs"><i class="fa-solid fa-circle-info"></i><span class="info-tooltip">
+                    La curva mostra come il tuo capitale si riduce nel tempo, tenendo conto sia dei bonifici mensili sia delle tasse allo Stato.<br><br>
+                    <strong class="text-slate-300">Passa il cursore sul grafico</strong> per vedere ogni anno: quanto rimane nel conto, l'importo esatto del bonifico (con lo spaccato per beneficiario) e quanto trattiene il fisco.
+                </span></div>
+            </div>
+            <p class="text-xs text-slate-600 mb-3">Azzeramento previsto all'Anno <span id="dir_txt-anni-grafico" class="text-emerald-400 font-semibold">–</span></p>
+            <div class="h-56 relative"><canvas id="dir_mainChart"></canvas></div>
+        </div>
+
+        <!-- BREAKDOWN GIORNO ZERO + EROGAZIONI -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="glass-panel p-5">
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Giorno Zero — cosa esce subito</h3>
+                <ul class="space-y-2.5 text-sm">
+                    <li class="flex justify-between border-b border-slate-700/50 pb-2.5">
+                        <span class="text-slate-400">Beneficenza</span>
+                        <span class="font-mono text-white" id="dir_out-beneficenza">€ –</span>
+                    </li>
+                    <li class="flex justify-between border-b border-slate-700/50 pb-2.5">
+                        <span class="text-slate-400">Regali totali</span>
+                        <span class="font-mono text-white" id="dir_out-f3-totale">€ –</span>
+                    </li>
+                    <li class="flex justify-between bg-slate-800/40 px-2 py-1.5 rounded-lg">
+                        <span class="text-slate-500 text-xs">A persona</span>
+                        <span class="font-mono text-slate-300 text-xs" id="dir_out-f3-singolo">€ –</span>
+                    </li>
+                </ul>
+            </div>
+            <div class="glass-panel p-5">
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Prelievi Mensili (Mese 1)</h3>
+                <ul class="space-y-2.5 text-sm">
+                    <li class="flex justify-between border-b border-slate-700/50 pb-2.5">
+                        <span class="text-emerald-400 font-semibold">La tua quota</span>
+                        <span class="font-mono text-emerald-400 font-bold" id="dir_out-tuo-mensile">€ –</span>
+                    </li>
+                    <li class="flex justify-between border-b border-slate-700/50 pb-2.5">
+                        <span class="text-slate-400">Gruppo 1 (a persona)</span>
+                        <span class="font-mono text-blue-300" id="dir_out-f1-singolo">€ –</span>
+                    </li>
+                    <li class="flex justify-between">
+                        <span class="text-slate-400">Gruppo 2 (a persona)</span>
+                        <span class="font-mono text-purple-300" id="dir_out-f2-singolo">€ –</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+    </main>
+</div><!-- /view-direct -->
+
+</div><!-- /container principale -->
+
+
+<!-- ═══════════════════════════════════════ -->
+<!-- JAVASCRIPT — Simulatori_9              -->
+<!-- ═══════════════════════════════════════ -->
+<script>
+// ════════════════════════════════════════════════════════════════════════
+// MOTORE FISCALE: ETF AD ACCUMULAZIONE — RISPARMIO AMMINISTRATO (Italia)
+// ════════════════════════════════════════════════════════════════════════
+//
+// MODELLO ADOTTATO: risparmio amministrato, ETF ad accumulazione.
+// Regime tipico dei privati italiani che investono tramite broker
+// (Fineco, Directa, DEGIRO, Scalable…) in ETF che reinvestono
+// automaticamente i proventi senza distribuirli.
+//
+// ┌─────────────────────────────────────────────────────────────────────┐
+// │  COME FUNZIONANO LE TASSE SUGLI ETF AD ACCUMULAZIONE IN ITALIA     │
+// ├─────────────────────────────────────────────────────────────────────┤
+// │  REGOLA FONDAMENTALE:                                               │
+// │  Le plusvalenze non si tassano mentre crescono.                     │
+// │  Il 26% si paga SOLO quando vendi le quote, e SOLO sulla parte      │
+// │  di guadagno di ciò che vendi.                                      │
+// │                                                                     │
+// │  OGNI MESE — 3 operazioni:                                          │
+// │  1. CRESCITA LORDA: il portafoglio cresce al tasso lordo.           │
+// │     Nessuna tassa: il guadagno è "latente", non ancora realizzato.  │
+// │  2. BOLLO (0,2%/anno): patrimoniale mensile (0,2%÷12).              │
+// │     Non modifica il prezzo di carico (cost basis).                  │
+// │  3. PRELIEVO NETTO: per incassare W€ netti si vende:                │
+// │     lordo = W ÷ (1 − gain_ratio × 26%)                              │
+// │     gain_ratio = (valore − costo_acquisto) / valore                 │
+// │                                                                     │
+// │  Esempio: portafoglio €1.200.000, costo acquisto €800.000           │
+// │    gain_ratio = 400.000/1.200.000 = 33,3%                           │
+// │    Per incassare €5.000 netti → vendi €5.228                        │
+// │    Tassa = €228  (vs €1.300 col modello "tassa mensile")            │
+// │                                                                     │
+// │  PREZZO DI CARICO: si riduce proporzionalmente a ogni vendita.      │
+// │  Se vendi il 2% del portafoglio, il cost basis scende del 2%.       │
+// │                                                                     │
+// │  PERCHÉ NON IL "26% MENSILE":                                       │
+// │  Quel modello simula fondi a distribuzione/obbligazioni con cedola. │
+// │  Per ETF accumulazione sopravvaluta le tasse del 15-30% su          │
+// │  orizzonti 20-30 anni, ignorando il compounding esentasse.          │
+// │                                                                     │
+// │  ZAINETTO FISCALE (minusvalenze compensabili): non modellato.       │
+// │  Il simulatore usa rendimento medio costante → nessuna minusvalenza. │
+// └─────────────────────────────────────────────────────────────────────┘
+
+'use strict';
+
+// ──────────────────────────────────────────────────────
+// COSTANTI
+// ──────────────────────────────────────────────────────
+const BOLLO_ANNUO = 0.002; // imposta di bollo: 0,2% annuo
+
+// ──────────────────────────────────────────────────────
+// UTILITY
+// ──────────────────────────────────────────────────────
+function formatCurrency(num) {
+    if (isNaN(num) || !isFinite(num)) return "€ 0";
+    return new Intl.NumberFormat('it-IT', { style:'currency', currency:'EUR', maximumFractionDigits:0 }).format(num);
+}
+function formatPerc(num) { return num.toFixed(1) + '%'; }
+
+// ──────────────────────────────────────────────────────
+// FEEDBACK VISIVO — flash sui KPI che cambiano valore
+// ──────────────────────────────────────────────────────
+function flashKpi(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('kpi-updated');
+    // Force reflow per riavviare l'animazione
+    void el.offsetWidth;
+    el.classList.add('kpi-updated');
+    el.addEventListener('animationend', () => el.classList.remove('kpi-updated'), { once: true });
+}
+
+// ──────────────────────────────────────────────────────
+// ONBOARDING
+// ──────────────────────────────────────────────────────
+function startApp(view) {
+    document.getElementById('onboarding-modal').style.display = 'none';
+    currentView = view;
+    if (view === 'direct') {
+        document.getElementById('view-direct').classList.remove('view-hidden');
+        document.getElementById('view-reverse').classList.add('view-hidden');
+        triggerDir();
+    } else {
+        triggerRev();
+    }
+    aggiornaPulsantiNav(view);
+}
+
+// ──────────────────────────────────────────────────────
+// TASSE LOCK / UNLOCK
+// ──────────────────────────────────────────────────────
+function toggleTasseLock(prefix) {
+    const input = document.getElementById(prefix + '_tasse');
+    const icon  = document.getElementById(prefix + '_tasse_lock_icon');
+    const badge = document.getElementById(prefix + '_tasse_badge');
+    const locked = input.disabled;
+    input.disabled = !locked;
+    icon.className = locked ? 'fa-solid fa-lock-open' : 'fa-solid fa-lock';
+    badge.innerHTML = locked
+        ? '<i class="fa-solid fa-lock-open text-[9px]"></i> Modificabile'
+        : '<i class="fa-solid fa-lock text-[9px]"></i> 26% Italia';
+    if (prefix === 'rev') triggerRev(); else triggerDir();
+}
+
+// ──────────────────────────────────────────────────────
+// SEZIONI COLLASSABILI
+// ──────────────────────────────────────────────────────
+function toggleSection(id) {
+    const content  = document.getElementById(id + '-content');
+    const chevron  = document.getElementById(id + '-chevron');
+    const isOpen   = !content.classList.contains('collapsed');
+    if (isOpen) {
+        content.classList.add('collapsed');
+        chevron.classList.remove('open');
+    } else {
+        content.classList.remove('collapsed');
+        chevron.classList.add('open');
+    }
+}
+
+// ──────────────────────────────────────────────────────
+// SELETTORE SCENARIO (pill-button)
+// ──────────────────────────────────────────────────────
+function setScenario(prefix, tipo) {
+    const isCresc = tipo === 'cresc';
+    const activeClass = prefix === 'rev' ? 'active-blue' : 'active-green';
+
+    // Aggiorna visual pill
+    const pillFisso = document.getElementById(prefix + '_pill-fisso');
+    const pillCresc = document.getElementById(prefix + '_pill-cresc');
+    if (pillFisso) {
+        pillFisso.classList.toggle(activeClass, !isCresc);
+        pillCresc.classList.toggle(activeClass, isCresc);
+    }
+
+    // Sincronizza il checkbox nascosto usato dai motori
+    const toggle = document.getElementById(prefix + '_toggle-inflazione');
+    if (toggle) toggle.checked = isCresc;
+
+    // Rilancia il calcolo
+    if (prefix === 'rev') triggerRev(); else triggerDir();
+}
+
+
+const DEFAULTS = {
+    reverse: {
+        rev_anni: 30, rev_rendimento: 4.0, rev_inflazione: 2.0, rev_tasse: 26.0,
+        rev_tuo_bonifico: 5000,
+        rev_f1_num: 0, rev_f1_quota: 0, rev_f2_num: 0, rev_f2_quota: 0,
+        rev_beneficenza_perc: 0, rev_f3_num: 0, rev_f3_quota: 0,
+    },
+    direct: {
+        dir_vincita: 1000000, dir_anni: 30, dir_rendimento: 4.0,
+        dir_inflazione: 2.0, dir_tasse: 26.0,
+        dir_beneficenza: 0, dir_f3_num: 0, dir_f3_perc: 0,
+        dir_f1_num: 0, dir_f1_perc: 0, dir_f2_num: 0, dir_f2_perc: 0,
+    }
+};
+
+function resetView(view) {
+    const defs = DEFAULTS[view];
+    for (const [id, val] of Object.entries(defs)) {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+    }
+    // Re-lock tasse e reset pill scenario
+    ['rev', 'dir'].forEach(p => {
+        const inp = document.getElementById(p + '_tasse');
+        const icon = document.getElementById(p + '_tasse_lock_icon');
+        const badge = document.getElementById(p + '_tasse_badge');
+        if (!inp) return;
+        inp.disabled = true;
+        if (icon) icon.className = 'fa-solid fa-lock';
+        if (badge) badge.innerHTML = '<i class="fa-solid fa-lock text-[9px]"></i> 26% Italia';
+        // Reset pill a "fisso"
+        const tog = document.getElementById(p + '_toggle-inflazione');
+        if (tog) tog.checked = false;
+        const activeClass = p === 'rev' ? 'active-blue' : 'active-green';
+        document.getElementById(p + '_pill-fisso')?.classList.add(activeClass);
+        document.getElementById(p + '_pill-cresc')?.classList.remove(activeClass);
+    });
+
+    if (view === 'reverse') triggerRev(); else triggerDir();
+}
+
+// ──────────────────────────────────────────────────────
+// SIDEBAR MOBILE
+// ──────────────────────────────────────────────────────
+function getSidebarId() {
+    return currentView === 'reverse' ? 'sidebar-reverse' : 'sidebar-direct';
+}
+function toggleSidebar() {
+    const sb = document.getElementById(getSidebarId());
+    sb.classList.contains('sidebar-open') ? closeSidebar() : openSidebar();
+}
+function openSidebar() {
+    document.getElementById(getSidebarId()).classList.add('sidebar-open');
+    document.getElementById('sidebar-overlay').classList.add('sidebar-open');
+    document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+    ['sidebar-reverse','sidebar-direct'].forEach(id => document.getElementById(id)?.classList.remove('sidebar-open'));
+    document.getElementById('sidebar-overlay')?.classList.remove('sidebar-open');
+    document.body.style.overflow = '';
+}
+
+// ──────────────────────────────────────────────────────
+// RIEPILOGO NARRATIVO
+// ──────────────────────────────────────────────────────
+function generaRiepilogoReverse(params) {
+    const { pmt1, pv, vLorda, benTot, f3Tot, totTasse, a, rA, isCresc, infA, annoEsaurimento } = params;
+    if (pmt1 <= 0 || pv <= 0) return null;
+    const tassePerc = pv > 0 ? (totTasse / pv * 100) : 0;
+    let t = `Per ricevere ${formatCurrency(pmt1)} netti al mese${isCresc ? ` (adeguati all'inflazione)` : ''} per ${a} anni, hai bisogno di ${formatCurrency(vLorda)} totali.`;
+    if (benTot + f3Tot > 0) t += ` Di questi, ${formatCurrency(benTot + f3Tot)} escono subito il Giorno Zero (donazioni e regali).`;
+    t += ` I restanti ${formatCurrency(pv)} vengono investiti in ETF al ${rA}% lordo annuo.`;
+    t += ` In ${a} anni il fisco tratterrà complessivamente ${formatCurrency(totTasse)} (${tassePerc.toFixed(1)}% del capitale) tra tasse sulla plusvalenza e imposta di bollo.`;
+    if (!isCresc && infA > 0) t += ` Con rata fissa e inflazione al ${infA}%, il potere d'acquisto si ridurrà nel tempo: considera "Rata crescente" per proteggerti.`;
+    if (annoEsaurimento) t += ` ⚠️ Attenzione: il capitale si esaurisce all'anno ${annoEsaurimento}, non all'anno ${a}.`;
+    return t;
+}
+
+function generaRiepilogoDirect(params) {
+    const { v, capIniz, r1, rataTua, totTasse, a, rA, infA, isCresc, infM, ben, f3Tot, annoEsaurimento, erosionePerc } = params;
+    if (v <= 0 || r1 <= 0) return null;
+    const tassePerc   = capIniz > 0 ? (totTasse / capIniz * 100) : 0;
+    const totNominale = totalePrelievi(r1, a * 12, infM, isCresc);
+    let t = `Investendo ${formatCurrency(capIniz)}`;
+    if (ben + f3Tot > 0) t += ` (dopo aver donato ${formatCurrency(ben + f3Tot)} il Giorno Zero)`;
+    t += ` in ETF al ${rA}% lordo annuo, puoi prelevare ${formatCurrency(r1)} netti al mese${isCresc ? ` (crescente con l'inflazione)` : ''} per ${a} anni.`;
+    t += ` Il fisco tratterrà ${formatCurrency(totTasse)} in totale (${tassePerc.toFixed(1)}% del capitale).`;
+    t += ` In ${a} anni preleverai complessivamente circa ${formatCurrency(totNominale)} in termini nominali.`;
+    if (!isCresc && infA > 0 && erosionePerc > 0) t += ` Con rata fissa e inflazione al ${infA}%, il potere d'acquisto si ridurrà del ${erosionePerc.toFixed(0)}% entro l'anno ${a}.`;
+    if (annoEsaurimento) t += ` ⚠️ Il capitale si esaurisce all'anno ${annoEsaurimento}, non all'anno ${a}.`;
+    return t;
+}
+
+function aggiornaRiepilogo(vista, params) {
+    const id = vista === 'reverse' ? 'rev_riepilogo' : 'dir_riepilogo';
+    const idT = vista === 'reverse' ? 'rev_riepilogo-testo' : 'dir_riepilogo-testo';
+    const testo = vista === 'reverse' ? generaRiepilogoReverse(params) : generaRiepilogoDirect(params);
+    const panel = document.getElementById(id);
+    if (testo) { document.getElementById(idT).textContent = testo; panel.classList.remove('hidden'); }
+    else panel.classList.add('hidden');
+}
+
+// ──────────────────────────────────────────────────────
+// TOOLTIP
+// ──────────────────────────────────────────────────────
+let globalTooltip = null;
+
+function initTooltips() {
+    if (!globalTooltip) {
+        globalTooltip = document.createElement('div');
+        globalTooltip.className = 'info-tooltip-global';
+        document.body.appendChild(globalTooltip);
+    }
+
+    document.querySelectorAll('.info-icon').forEach(icon => {
+        const content = icon.querySelector('.info-tooltip')?.innerHTML;
+        if (!content) return;
+        
+        icon.addEventListener('mouseenter', function (e) {
+            globalTooltip.innerHTML = content;
+            globalTooltip.classList.add('visible');
+            
+            globalTooltip.style.visibility = 'hidden';
+            globalTooltip.style.display = 'block';
+            globalTooltip.classList.remove('tooltip-below', 'tooltip-left', 'tooltip-right');
+            
+            const iconRect = this.getBoundingClientRect();
+            const ttRect = globalTooltip.getBoundingClientRect();
+            
+            let topPosition = iconRect.top - ttRect.height - 10;
+            let leftPosition = iconRect.left + (iconRect.width / 2) - (ttRect.width / 2);
+            let arrowClass = '';
+            
+            if (topPosition < 10) { 
+                topPosition = iconRect.bottom + 10;
+                arrowClass = 'tooltip-below';
+            }
+            if (leftPosition + ttRect.width > window.innerWidth - 10) { 
+                leftPosition = window.innerWidth - ttRect.width - 10;
+                arrowClass = 'tooltip-left'; 
+            } else if (leftPosition < 10) { 
+                leftPosition = 10;
+                arrowClass = 'tooltip-right';
+            }
+            
+            globalTooltip.style.top = topPosition + 'px';
+            globalTooltip.style.left = leftPosition + 'px';
+            if (arrowClass) globalTooltip.classList.add(arrowClass);
+            
+            globalTooltip.style.visibility = 'visible';
+        });
+        
+        icon.addEventListener('mouseleave', function () {
+            globalTooltip.classList.remove('visible');
+            globalTooltip.style.display = 'none';
+        });
+    });
+}
+
+// ──────────────────────────────────────────────────────
+// NAVIGAZIONE TAB
+// ──────────────────────────────────────────────────────
+let currentView = 'reverse';
+
+const btnReverseActive = "px-3 md:px-5 py-2 rounded-full font-semibold transition-all duration-300 text-sm bg-blue-500/20 text-blue-400 border border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.2)]";
+const btnDirectActive  = "px-3 md:px-5 py-2 rounded-full font-semibold transition-all duration-300 text-sm bg-emerald-500/20 text-emerald-400 border border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]";
+const btnInactive      = "px-3 md:px-5 py-2 rounded-full font-semibold transition-all duration-300 text-sm text-slate-400 hover:text-white border border-transparent hover:border-slate-600";
+
+function aggiornaPulsantiNav(target) {
+    document.getElementById('btn-nav-reverse').className = target === 'reverse' ? btnReverseActive : btnInactive;
+    document.getElementById('btn-nav-direct').className  = target === 'direct'  ? btnDirectActive  : btnInactive;
+}
+
+function switchView(target) {
+    if (currentView === target) return;
+    currentView = target;
+    if (chartTooltipEl) chartTooltipEl.style.opacity = '0';
+    const viewDirect  = document.getElementById('view-direct');
+    const viewReverse = document.getElementById('view-reverse');
+    if (target === 'direct') {
+        viewDirect.classList.remove('view-hidden');
+        viewReverse.classList.add('view-hidden');
+        triggerDir();
+        requestAnimationFrame(() => { if (dirChart) dirChart.resize(); });
+    } else {
+        viewReverse.classList.remove('view-hidden');
+        viewDirect.classList.add('view-hidden');
+        triggerRev();
+        requestAnimationFrame(() => { if (revChart) revChart.resize(); });
+    }
+    aggiornaPulsantiNav(target);
+}
+
+// ──────────────────────────────────────────────────────
+// CORE FISCALE — simulazione veloce per binary search
+// ──────────────────────────────────────────────────────
+/**
+ * Simula N mesi e restituisce il capitale finale.
+ * Valore negativo = capitale esaurito prima della fine.
+ * Non raccoglie dati grafico — usata solo dalla binary search.
+ */
+function simCapFinale(capIniz, pmt1, mesi, rA, tP, isCresc, infM) {
+    const bM  = BOLLO_ANNUO / 12;
+    const rGM = Math.pow(1 + rA / 100, 1/12) - 1;  // rendimento lordo mensile
+    let cap   = capIniz;
+    let cb    = capIniz;  // cost basis (prezzo di carico totale)
+    let netto = pmt1; // il bonifico che si vuole liquidare al netto delle tasse
+    for (let i = 1; i <= mesi; i++) {
+        // Se si e' scelta la rata crescente, si adegua all'inflazione progressiva
+        if (isCresc && i > 1) netto *= (1 + infM);
+        
+        cap += cap * rGM;        // crescita lorda — le tasse non si pagano sui guadagni latenti
+        cap -= cap * bM;         // bollo mensile pro-rata dello 0.2%
+        if (cap <= 0) return -1;
+        
+        // gr = Gain Ratio, calcola la percentuale del capitale che e' costituita da guadagni
+        const gr    = Math.max(0, (cap - cb) / cap);
+        // tf = Tax Factor, stima il moltiplicatore effettivo delle tasse rispetto al prelievo che stai realizzando
+        // (Il 26% grava unicamente sulla fetta di gain ratio venduta)
+        const tf    = Math.max(0.001, 1 - gr * (tP / 100));
+        // gSold = Quante quote lorde devi disinvestire per farti accreditare "netto" Euro sul conto
+        const gSold = netto / tf;
+        
+        // Calcoliamo quanto questo disinvestimento ha alleggerito il nostro prezzo di carico originario
+        const frac  = Math.min(1, gSold / cap);
+        cb  *= (1 - frac);
+        cap -= gSold;
+        
+        if (cap < 0) return cap;
+    }
+    return cap;
+}
+
+/** Binary search: PMT netto iniziale che azzera il capitale a `mesi` mesi. */
+function trovaPMT(capIniz, mesi, rA, tP, isCresc, infM) {
+    if (capIniz <= 0) return 0;
+    let lo = 0, hi = capIniz / mesi * 6;
+    let fallback = 0; // Previene loop infinito per scenari (es: -50% annuo su 40 anni)
+    while (simCapFinale(capIniz, hi, mesi, rA, tP, isCresc, infM) > 0) {
+        hi *= 2;
+        if (fallback++ > 100) break;
+    }
+    for (let k = 0; k < 60; k++) {
+        const mid = (lo + hi) / 2;
+        if (simCapFinale(capIniz, mid, mesi, rA, tP, isCresc, infM) > 0) lo = mid;
+        else hi = mid;
+        if (hi - lo < 0.01) break;
+    }
+    return (lo + hi) / 2;
+}
+
+/** Binary search: capitale iniziale (PV) che si azzera a `mesi` mesi con PMT netto pmt1. */
+function trovaPV(pmt1, mesi, rA, tP, isCresc, infM) {
+    if (pmt1 <= 0) return 0;
+    let lo = 0, hi = pmt1 * mesi * 4;
+    let fallback = 0; // Previene loop infinito per scenari (es: -50% annuo su 40 anni)
+    while (simCapFinale(hi, pmt1, mesi, rA, tP, isCresc, infM) <= 0) {
+        hi *= 2;
+        if (fallback++ > 100) break;
+    }
+    for (let k = 0; k < 60; k++) {
+        const mid = (lo + hi) / 2;
+        if (simCapFinale(mid, pmt1, mesi, rA, tP, isCresc, infM) <= 0) lo = mid;
+        else hi = mid;
+        if (hi - lo < 0.01) break;
+    }
+    return (lo + hi) / 2;
+}
+
+// ──────────────────────────────────────────────────────
+// SIMULAZIONE COMPLETA (dati per grafico + KPI)
+// ──────────────────────────────────────────────────────
+function simulaETFAccumulo(capIniz, pmt1, mesi, rA, tP, isCresc, infM, ratios = {tu:1, f1:0, f2:0}) {
+    const bM  = BOLLO_ANNUO / 12;
+    const rGM = Math.pow(1 + rA / 100, 1/12) - 1;
+    let cap   = capIniz, cb = capIniz;
+    let totTasse = 0, tasseAcc = 0;
+    let netto = pmt1, meseEsaurimento = null;
+    const lbls = [], dataCap = [], dataCapLordo = [], dataStore = [];
+    let capLordo = capIniz;  // ipotetico: zero tasse, zero bollo
+    for (let i = 1; i <= mesi; i++) {
+        if (isCresc && i > 1) netto *= (1 + infM);
+        cap += cap * rGM;
+        const bollo = cap * bM;
+        cap -= bollo; totTasse += bollo; tasseAcc += bollo;
+        let tassePV = 0, gSold = netto, grPre = 0;
+        if (cap > 0) {
+            grPre    = Math.max(0, (cap - cb) / cap);
+            const tf = Math.max(0.001, 1 - grPre * (tP / 100));
+            gSold    = netto / tf;
+            tassePV  = gSold - netto;
+            totTasse += tassePV; tasseAcc += tassePV;
+            cb *= (1 - Math.min(1, gSold / cap));
+        }
+        const capPrec = cap;
+        cap -= gSold;
+        if (!isFinite(cap) || cap < 0) {
+            if (meseEsaurimento === null) meseEsaurimento = i;
+            cap = 0; cb = 0;
+        }
+        capLordo = capLordo + capLordo * rGM - netto;
+        if (!isFinite(capLordo) || capLordo < 0) capLordo = 0;
+        if (i === 1 || i % 12 === 0 || i === mesi) {
+            lbls.push(i === 1 ? 'Inizio' : `Anno ${Math.ceil(i / 12)}`);
+            dataCap.push(parseFloat(cap.toFixed(2)));
+            dataCapLordo.push(parseFloat(capLordo.toFixed(2)));
+            const prlReale = netto / Math.pow(1 + infM, i - 1);
+            dataStore.push({ 
+                mIdx: i, 
+                cIn: capPrec, 
+                tassePV, 
+                bollo, 
+                gainRatio: grPre, 
+                prl: netto, 
+                prlReale, 
+                cFin: cap, 
+                tasseAcc,
+                breakdown: {
+                    tu: netto * (ratios.tu || 0),
+                    f1: netto * (ratios.f1 || 0),
+                    f2: netto * (ratios.f2 || 0),
+                    pTu: ((ratios.tu || 0) * 100).toFixed(1),
+                    pF1: ((ratios.f1 || 0) * 100).toFixed(1),
+                    pF2: ((ratios.f2 || 0) * 100).toFixed(1)
+                }
+            });
+        }
+    }
+    const annoEsaurimento = meseEsaurimento !== null && meseEsaurimento < (mesi - 11)
+        ? Math.ceil(meseEsaurimento / 12) : null;
+    return { lbls, dataCap, dataCapLordo, dataStore, totTasse, capFinale: cap, annoEsaurimento };
+}
+
+/** Inflazione mensile da annua */
+function infMensile(infA) {
+    return infA === 0 ? 0 : Math.pow(1 + infA / 100, 1/12) - 1;
+}
+
+/**
+ * Totale prelievi nominali nel periodo.
+ * Rata fissa: pmt1 × mesi
+ * Rata crescente: progressione geometrica = pmt1 × [(1+infM)^mesi − 1] / infM
+ */
+function totalePrelievi(pmt1, mesi, infM, isCresc) {
+    if (!isCresc || infM < 1e-9) return pmt1 * mesi;
+    return pmt1 * (Math.pow(1 + infM, mesi) - 1) / infM;
+}
+
+// ──────────────────────────────────────────────────────
+// GRAFICO — Tooltip DOM esterno (sempre visibile, z-index massimo)
+// ──────────────────────────────────────────────────────
+let chartTooltipEl = null;
+
+function getChartTooltipEl() {
+    if (!chartTooltipEl) {
+        chartTooltipEl = document.createElement('div');
+        chartTooltipEl.id = 'chart-tooltip-ext';
+        Object.assign(chartTooltipEl.style, {
+            position: 'fixed',
+            zIndex: '999999',
+            pointerEvents: 'none',
+            background: 'rgba(15,23,42,0.97)',
+            border: '1px solid #334155',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '12.5px',
+            color: '#cbd5e1',
+            lineHeight: '1.6',
+            minWidth: '240px',
+            maxWidth: '310px',
+            boxShadow: '0 20px 40px -8px rgba(0,0,0,0.85)',
+            opacity: '0',
+            transition: 'opacity 0.15s ease'
+        });
+        document.body.appendChild(chartTooltipEl);
+    }
+    return chartTooltipEl;
+}
+
+function buildChartTooltipHTML(d, hexColor) {
+    const annoAttuale = Math.ceil(d.mIdx / 12);
+    const isIndicizzata = Math.abs(d.prl - d.prlReale) > 1;
+    const sep = `<div style="height:1px;background:#1e293b;margin:10px 0"></div>`;
+
+    // Titolo
+    let html = `<div style="font-size:13.5px;font-weight:700;color:${hexColor};margin-bottom:10px">
+        Riepilogo — Anno ${annoAttuale}
+    </div>`;
+
+    // Capitale rimasto
+    html += `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+        <span style="color:#94a3b8">Capitale ancora disponibile</span>
+        <span style="color:#f8fafc;font-weight:600;margin-left:12px;white-space:nowrap">${formatCurrency(d.cFin)}</span>
+    </div>`;
+
+    html += sep;
+
+    // Bonifico netto totale
+    html += `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+        <span style="color:#e2e8f0;font-weight:600">Bonifico Netto (Mese)</span>
+        <span style="color:#f8fafc;font-weight:700;margin-left:12px;white-space:nowrap">${formatCurrency(d.prl)}</span>
+    </div>`;
+
+    // Spaccato quote
+    if (d.breakdown) {
+        if (d.breakdown.tu > 0) {
+            html += `<div style="display:flex;justify-content:space-between;align-items:baseline;padding-left:10px;margin-bottom:3px;font-size:12px">
+                <span style="color:#64748b">· Tuo bonifico personale</span>
+                <span style="color:#94a3b8;white-space:nowrap;margin-left:8px">${formatCurrency(d.breakdown.tu)}&nbsp;<span style="color:#475569">${d.breakdown.pTu}%</span></span>
+            </div>`;
+        }
+        if (d.breakdown.f1 > 0) {
+            html += `<div style="display:flex;justify-content:space-between;align-items:baseline;padding-left:10px;margin-bottom:3px;font-size:12px">
+                <span style="color:#64748b">· Gruppo 1</span>
+                <span style="color:#94a3b8;white-space:nowrap;margin-left:8px">${formatCurrency(d.breakdown.f1)}&nbsp;<span style="color:#475569">${d.breakdown.pF1}%</span></span>
+            </div>`;
+        }
+        if (d.breakdown.f2 > 0) {
+            html += `<div style="display:flex;justify-content:space-between;align-items:baseline;padding-left:10px;margin-bottom:3px;font-size:12px">
+                <span style="color:#64748b">· Gruppo 2</span>
+                <span style="color:#94a3b8;white-space:nowrap;margin-left:8px">${formatCurrency(d.breakdown.f2)}&nbsp;<span style="color:#475569">${d.breakdown.pF2}%</span></span>
+            </div>`;
+        }
+    }
+
+    if (isIndicizzata) {
+        html += `<div style="font-size:11.5px;color:#60a5fa;margin-top:5px;padding-left:10px">
+            ↑ Importo adeguato all'inflazione ogni anno
+        </div>`;
+    }
+
+    html += sep;
+
+    // Stato
+    const totStato = d.tassePV + d.bollo;
+    html += `<div style="color:#94a3b8;font-size:12px;font-weight:600;margin-bottom:6px">Trattenuto dallo Stato (questo mese)</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px">
+        <span style="color:#64748b">· Tasse sui guadagni (26%)</span>
+        <span style="color:#f87171;white-space:nowrap">${formatCurrency(d.tassePV)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:${totStato > 0 ? '6px' : '0'};font-size:12px">
+        <span style="color:#64748b">· Imposta di bollo (0,2% annuo)</span>
+        <span style="color:#f87171;white-space:nowrap">${formatCurrency(d.bollo)}</span>
+    </div>`;
+
+    if (totStato > 0) {
+        html += `<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;padding-top:5px;border-top:1px solid #1e293b">
+            <span style="color:#ef4444">Totale al fisco</span>
+            <span style="color:#ef4444;white-space:nowrap">${formatCurrency(totStato)}</span>
+        </div>`;
+    }
+
+    return html;
+}
+
+function externalChartTooltip(context, hexColor, dataStore) {
+    const { chart, tooltip } = context;
+    const el = getChartTooltipEl();
+
+    if (tooltip.opacity === 0) {
+        el.style.opacity = '0';
+        return;
+    }
+
+    const store = chart.customDataStore || dataStore;
+    const dataIndex = tooltip.dataPoints?.[0]?.dataIndex;
+    const d = store?.[dataIndex];
+    if (!d) { el.style.opacity = '0'; return; }
+
+    el.innerHTML = buildChartTooltipHTML(d, hexColor);
+    el.style.opacity = '1';
+
+    // Posizionamento basato su coordinate fixed (non clippato da overflow)
+    const canvasRect = chart.canvas.getBoundingClientRect();
+    const ttW = el.offsetWidth  || 270;
+    const ttH = el.offsetHeight || 220;
+
+    let left = canvasRect.left + tooltip.caretX - ttW / 2;
+    let top  = canvasRect.top  + tooltip.caretY - ttH - 14;
+
+    // Blocco ai bordi del viewport
+    if (left + ttW > window.innerWidth  - 8) left = window.innerWidth  - ttW - 8;
+    if (left < 8) left = 8;
+    if (top  < 8) top  = canvasRect.top + tooltip.caretY + 14; // sotto se non c'è spazio sopra
+    if (top  + ttH > window.innerHeight - 8) top = window.innerHeight - ttH - 8;
+
+    el.style.left = left + 'px';
+    el.style.top  = top  + 'px';
+}
+
+// ──────────────────────────────────────────────────────
+function buildGradient(ctx, colorRgbString) {
+    const h = ctx.canvas.offsetHeight || 280;
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, colorRgbString + ' 0.35)');
+    g.addColorStop(1, colorRgbString + ' 0.0)');
+    return g;
+}
+
+function drawChart(canvasId, chartObj, labels, dataNetto, dataLordo, dataStore, colorRgbString, hexColor, setChartCallback) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (chartObj) {
+        chartObj.data.labels = labels;
+        chartObj.data.datasets[0].data = dataNetto;
+        chartObj.data.datasets[0].backgroundColor = buildGradient(ctx, colorRgbString);
+        chartObj.customDataStore = dataStore;
+        chartObj.update('none');
+        chartObj.resize();
+    } else {
+        const newChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets: [
+                {
+                    label: 'Capitale rimasto',
+                    data: dataNetto, borderColor: hexColor,
+                    backgroundColor: buildGradient(ctx, colorRgbString),
+                    borderWidth: 2.5, fill: true, tension: 0.4,
+                    pointRadius: 3, pointBackgroundColor: '#0f172a',
+                    pointBorderColor: hexColor, pointHoverRadius: 6,
+                    pointHoverBackgroundColor: hexColor, order: 1
+                }
+            ]},
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: false,
+                        external: (ctx) => externalChartTooltip(ctx, hexColor, dataStore)
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#94a3b8', callback: (val) => {
+                            if (val >= 1_000_000) return '€ ' + (val/1_000_000).toFixed(val % 1_000_000 === 0 ? 0 : 1) + 'M';
+                            if (val >= 1_000)     return '€ ' + (val/1_000).toFixed(0) + 'k';
+                            return '€ ' + val.toFixed(0);
+                        }}
+                    },
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8', maxTicksLimit: 12 } }
+                }
+            }
+        });
+        newChart.customDataStore = dataStore;
+        setChartCallback(newChart);
+    }
+}
+
+// ──────────────────────────────────────────────────────
+// MOTORE DIRECT
+// ──────────────────────────────────────────────────────
+let dirChart = null, dirDataStore = [], dirTimeout = null;
+
+function triggerDir() {
+    clearTimeout(dirTimeout);
+    dirTimeout = setTimeout(() => { enforceDirPercentages(); }, 50);
+}
+
+function enforceDirPercentages() {
+    let f1 = Math.max(parseFloat(document.getElementById('dir_f1_perc').value) || 0, 0);
+    let f2 = Math.max(parseFloat(document.getElementById('dir_f2_perc').value) || 0, 0);
+    const total = f1 + f2, rem = 100 - total;
+    if (rem < 0) {
+        const sTot = total > 0 ? total : 1;
+        document.getElementById('dir_quota_tua').value = 0;
+        document.getElementById('dir_bar-f1').style.width = (f1/sTot*100)+'%';
+        document.getElementById('dir_bar-f2').style.width = (f2/sTot*100)+'%';
+        document.getElementById('dir_bar-tuo').style.width = '0%';
+    } else {
+        document.getElementById('dir_quota_tua').value = rem.toFixed(1);
+        document.getElementById('dir_bar-f1').style.width = f1+'%';
+        document.getElementById('dir_bar-f2').style.width = f2+'%';
+        document.getElementById('dir_bar-tuo').style.width = rem+'%';
+    }
+    calcDirect();
+}
+
+function calcDirect() {
+    if (currentView !== 'direct') return;
+    const v    = Math.max(parseFloat(document.getElementById('dir_vincita').value) || 0, 0);
+    const a    = Math.min(Math.max(parseInt(document.getElementById('dir_anni').value) || 1, 1), 150);
+    const rA   = Math.min(Math.max(parseFloat(document.getElementById('dir_rendimento').value) || 0, -99), 100);
+    const tP   = Math.min(Math.max(parseFloat(document.getElementById('dir_tasse').value) || 0, 0), 100);
+    const infA = Math.min(Math.max(parseFloat(document.getElementById('dir_inflazione').value) || 0, -99), 100);
+    const isCresc = document.getElementById('dir_toggle-inflazione').checked;
+    const bP   = Math.min(Math.max(parseFloat(document.getElementById('dir_beneficenza').value) || 0, 0), 99);
+    const f3N  = Math.max(parseInt(document.getElementById('dir_f3_num').value) || 0, 0);
+    const f3P  = Math.min(Math.max(parseFloat(document.getElementById('dir_f3_perc').value) || 0, 0), 100);
+    let f1P    = Math.max(parseFloat(document.getElementById('dir_f1_perc').value) || 0, 0);
+    let f2P    = Math.max(parseFloat(document.getElementById('dir_f2_perc').value) || 0, 0);
+    const f1N  = Math.max(parseInt(document.getElementById('dir_f1_num').value) || 0, 0);
+    const f2N  = Math.max(parseInt(document.getElementById('dir_f2_num').value) || 0, 0);
+    let qT = 100 - (f1P + f2P);
+    if (qT < 0) { const s = f1P+f2P; f1P = f1P/s*100; f2P = f2P/s*100; qT = 0; }
+
+    const mesi    = a * 12;
+    const ben     = v * (bP / 100);
+    const f3Tot   = v * (f3P / 100) * f3N;
+    const capIniz = Math.max(v - ben - f3Tot, 0);
+    const infM    = infMensile(infA);
+
+    // Binary search: PMT netto che azzera il capitale a `mesi` mesi
+    const r1 = trovaPMT(capIniz, mesi, rA, tP, isCresc, infM);
+    const ratios = { tu: qT/100, f1: f1P/100, f2: f2P/100 };
+    const { lbls, dataCap, dataCapLordo, dataStore, totTasse, annoEsaurimento } =
+        simulaETFAccumulo(capIniz, r1, mesi, rA, tP, isCresc, infM, ratios);
+    dirDataStore = dataStore;
+
+    const rataTua         = r1 * (qT / 100);
+    const rataRealeFinale = rataTua > 0 ? rataTua / Math.pow(1 + infA / 100, a) : 0;
+    const erosionePerc    = rataTua > 0 ? ((1 - rataRealeFinale / rataTua) * 100) : 0;
+    const tassePerc       = capIniz > 0 ? (totTasse / capIniz * 100) : 0;
+
+    document.getElementById('dir_kpi-rata').innerText        = formatCurrency(r1);
+    document.getElementById('dir_kpi-rata-tipo').innerHTML   = isCresc
+        ? `<i class="fa-solid fa-arrow-trend-up text-emerald-400 mr-1"></i> Crescente · ${a} anni`
+        : `Fissa · ${a} anni`;
+    document.getElementById('dir_kpi-capitale').innerText    = formatCurrency(capIniz);
+    document.getElementById('dir_kpi-tuo').innerText         = formatCurrency(rataTua);
+    document.getElementById('dir_kpi-tasse-totali').innerText = formatCurrency(totTasse);
+    document.getElementById('dir_kpi-tasse-perc').innerText   = `${formatPerc(tassePerc)} del capitale`;
+    document.getElementById('dir_kpi-uscite-zero').innerText  = formatCurrency(ben + f3Tot);
+
+    ['dir_kpi-rata','dir_kpi-capitale','dir_kpi-tuo','dir_kpi-tasse-totali'].forEach(flashKpi);
+
+    document.getElementById('dir_out-beneficenza').innerText  = formatCurrency(ben);
+    document.getElementById('dir_out-f3-totale').innerText    = formatCurrency(f3Tot);
+    document.getElementById('dir_out-f3-singolo').innerText   = formatCurrency(f3N > 0 ? f3Tot / f3N : 0);
+    document.getElementById('dir_out-tuo-mensile').innerText  = formatCurrency(rataTua);
+    document.getElementById('dir_out-f1-singolo').innerText   = formatCurrency(f1N > 0 ? (r1 * f1P / 100) / f1N : 0);
+    document.getElementById('dir_out-f2-singolo').innerText   = formatCurrency(f2N > 0 ? (r1 * f2P / 100) / f2N : 0);
+    document.getElementById('dir_txt-anni-grafico').innerText = a;
+
+    // Banner potere d'acquisto
+    const potereBannerDir = document.getElementById('dir_kpi-potere-row');
+    if (!isCresc && infA > 0 && rataTua > 0) {
+        potereBannerDir.classList.remove('hidden');
+        document.getElementById('dir_txt-inf-pa').innerText     = formatPerc(infA);
+        document.getElementById('dir_txt-rata-nom').innerText   = formatCurrency(rataTua);
+        document.getElementById('dir_txt-rata-reale').innerText = formatCurrency(rataRealeFinale);
+        document.getElementById('dir_txt-anni-pa').innerText    = a;
+        document.getElementById('dir_txt-erosione').innerText   = erosionePerc.toFixed(0) + '%';
+    } else {
+        potereBannerDir.classList.add('hidden');
+    }
+
+    const bannerDir = document.getElementById('dir_banner-impossibile');
+    if (annoEsaurimento !== null) {
+        bannerDir.classList.remove('hidden');
+        document.getElementById('dir_txt-durata-reale').innerText  = annoEsaurimento;
+        document.getElementById('dir_txt-durata-target').innerText = a;
+    } else { bannerDir.classList.add('hidden'); }
+
+    drawChart('dir_mainChart', dirChart, lbls, dataCap, dataCapLordo, dirDataStore,
+        'rgba(16,185,129,', '#10b981', (c) => { dirChart = c; });
+    aggiornaRiepilogo('direct', { v, capIniz, r1, rataTua, totTasse, a, rA, infA, isCresc, infM, ben, f3Tot, annoEsaurimento, erosionePerc });
+}
+
+// ──────────────────────────────────────────────────────
+// MOTORE REVERSE
+// ──────────────────────────────────────────────────────
+let revChart = null, revDataStore = [], revTimeout = null;
+
+function triggerRev() {
+    clearTimeout(revTimeout);
+    revTimeout = setTimeout(() => { calcReverse(); }, 50);
+}
+
+function calcReverse() {
+    if (currentView !== 'reverse') return;
+    const pmtTu = Math.max(parseFloat(document.getElementById('rev_tuo_bonifico').value) || 0, 0);
+    const f1N   = Math.max(parseInt(document.getElementById('rev_f1_num').value) || 0, 0);
+    const f1Q   = Math.max(parseFloat(document.getElementById('rev_f1_quota').value) || 0, 0);
+    const f2N   = Math.max(parseInt(document.getElementById('rev_f2_num').value) || 0, 0);
+    const f2Q   = Math.max(parseFloat(document.getElementById('rev_f2_quota').value) || 0, 0);
+    const pmt1  = pmtTu + (f1N*f1Q) + (f2N*f2Q);
+    let bP = Math.max(parseFloat(document.getElementById('rev_beneficenza_perc').value) || 0, 0);
+    if (bP >= 100) bP = 99.9;
+    const f3N   = Math.max(parseInt(document.getElementById('rev_f3_num').value) || 0, 0);
+    const f3Q   = Math.max(parseFloat(document.getElementById('rev_f3_quota').value) || 0, 0);
+    const f3Tot = f3N * f3Q;
+    const a    = Math.min(Math.max(parseInt(document.getElementById('rev_anni').value) || 1, 1), 150);
+    const mesi = a * 12;
+    const rA   = Math.min(Math.max(parseFloat(document.getElementById('rev_rendimento').value) || 0, -99), 100);
+    const tP   = Math.min(Math.max(parseFloat(document.getElementById('rev_tasse').value) || 0, 0), 100);
+    const infA = Math.min(Math.max(parseFloat(document.getElementById('rev_inflazione').value) || 0, -99), 100);
+    const isCresc = document.getElementById('rev_toggle-inflazione').checked;
+    const infM    = infMensile(infA);
+
+    // Binary search: PV che con prelievo netto pmt1 si azzera a `mesi` mesi
+    const pv       = trovaPV(pmt1, mesi, rA, tP, isCresc, infM);
+    const capNetto = pv + f3Tot;
+    const vTotale  = capNetto / (1 - bP / 100);
+    const benTot   = vTotale * (bP / 100);
+    const ratios   = { tu: pmtTu/pmt1, f1: (f1N*f1Q)/pmt1, f2: (f2N*f2Q)/pmt1 };
+    const { lbls, dataCap, dataCapLordo, dataStore, totTasse, annoEsaurimento } =
+        simulaETFAccumulo(pv, pmt1, mesi, rA, tP, isCresc, infM, ratios);
+    revDataStore = dataStore;
+    const tassePerc       = pv > 0 ? (totTasse / pv * 100) : 0;
+    const rataRealeFinale = pmtTu > 0 ? pmtTu / Math.pow(1 + infA / 100, a) : 0;
+    const erosionePerc    = pmtTu > 0 ? ((1 - rataRealeFinale / pmtTu) * 100) : 0;
+
+    document.getElementById('rev_kpi-target').innerText = formatCurrency(vTotale);
+    document.getElementById('rev_kpi-target-sub').innerHTML =
+        `La cifra totale per ricevere <strong class="text-white">${formatCurrency(pmt1)} netti/mese</strong> per <strong class="text-white">${a} anni</strong>, donazioni Giorno Zero incluse.`;
+    document.getElementById('rev_kpi-investimento').innerText = formatCurrency(pv);
+    document.getElementById('rev_kpi-uscite').innerText       = formatCurrency(benTot + f3Tot);
+    document.getElementById('rev_kpi-costo-mese').innerText   = formatCurrency(pmt1);
+    document.getElementById('rev_kpi-rata-tipo').innerHTML    = isCresc
+        ? `<i class="fa-solid fa-arrow-trend-up text-blue-400 mr-1"></i> Indicizzata all'inflazione`
+        : `Rata fissa`;
+    document.getElementById('rev_kpi-tasse-totali').innerText = formatCurrency(totTasse);
+    document.getElementById('rev_kpi-tasse-desc').innerText   = `${formatPerc(tassePerc)} del capitale investito`;
+    document.getElementById('rev_txt-anni-grafico').innerText = a;
+
+    ['rev_kpi-target','rev_kpi-investimento','rev_kpi-costo-mese','rev_kpi-tasse-totali'].forEach(flashKpi);
+
+    const bannerRev = document.getElementById('rev_banner-impossibile');
+    if (annoEsaurimento !== null) {
+        bannerRev.classList.remove('hidden');
+        document.getElementById('rev_txt-durata-reale').innerText    = annoEsaurimento;
+        document.getElementById('rev_txt-durata-target-r').innerText = a;
+        document.getElementById('rev_txt-pmt-impossibile').innerText = formatCurrency(pmt1);
+    } else { bannerRev.classList.add('hidden'); }
+
+    const potereBanner = document.getElementById('rev_kpi-potere-row');
+    if (!isCresc && infA > 0 && pmtTu > 0) {
+        potereBanner.classList.remove('hidden');
+        document.getElementById('rev_txt-inf-pa').innerText     = formatPerc(infA);
+        document.getElementById('rev_txt-rata-nom').innerText   = formatCurrency(pmtTu);
+        document.getElementById('rev_txt-rata-reale').innerText = formatCurrency(rataRealeFinale);
+        document.getElementById('rev_txt-anni-pa').innerText    = a;
+        document.getElementById('rev_txt-erosione').innerText   = erosionePerc.toFixed(0) + '%';
+    } else { potereBanner.classList.add('hidden'); }
+
+    drawChart('rev_mainChart', revChart, lbls, dataCap, dataCapLordo, revDataStore,
+        'rgba(59,130,246,', '#3b82f6', (c) => { revChart = c; });
+    aggiornaRiepilogo('reverse', { pmt1, pv, vLorda: vTotale, benTot, f3Tot, totTasse, a, rA, tP, isCresc, infA, annoEsaurimento });
+}
+
+// ──────────────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    initTooltips();
+    // Non lanciare calcoli finché l'utente non ha scelto la modalità dal modale
+    // triggerRev() viene chiamato da startApp()
+});
+</script>
+</body>
+</html>
