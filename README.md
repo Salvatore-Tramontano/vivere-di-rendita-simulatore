@@ -2,8 +2,6 @@
 
 Strumento di simulazione per pianificare la gestione di un capitale nel tempo, con calcolo fiscale italiano (ETF ad accumulazione, imposta di bollo e tassazione sulle plusvalenze).
 
-> **Nota sul file:** il simulatore si chiama `Simulatori_9.html` perché è la nona versione di sviluppo. Puoi rinominarlo come preferisci senza perdere nulla.
-
 ---
 
 ## Cos'è
@@ -21,12 +19,20 @@ Puoi passare da una all'altra con i pulsanti in alto.
 
 ## Come aprirlo
 
-1. Scarica il file `Simulatori_9.html`
+1. Scarica il file `Simulatore - Vivere di rendita`
 2. Aprilo trascinandolo nel browser, oppure fai doppio clic
 
 Nessuna installazione richiesta.
 
 > **Connessione internet:** al primo avvio il simulatore scarica font, icone e la libreria per i grafici da internet (CDN). Se sei offline, alcune parti visive potrebbero non caricarsi correttamente. I calcoli rimangono comunque funzionanti.
+
+---
+
+## Disclaimer
+
+**Questo strumento è esclusivamente a scopo educativo**
+
+I risultati prodotti dal simulatore sono proiezioni basate su ipotesi semplificate e non costituiscono consulenza finanziaria, fiscale o legale. Le performance passate dei mercati finanziari non garantiscono risultati futuri. Prima di prendere decisioni di investimento rilevanti, rivolgiti a un consulente finanziario indipendente e abilitato.
 
 ---
 
@@ -160,33 +166,4 @@ Il simulatore usa l'aliquota del 26% per tutta la durata. La normativa fiscale p
 
 Il modello assume un unico asset con rendimento omogeneo. Portafogli reali sono più complessi (diverse asset class, ribilanciamenti, dividendi, ecc.).
 
-### Nessuna spesa straordinaria
 
-Il modello non include spese impreviste (salute, immobili, emergenze). Il prelievo mensile è l'unica uscita prevista oltre al fisco.
-
----
-
-## Disclaimer
-
-**Questo strumento è esclusivamente a scopo educativo e informativo.**
-
-I risultati prodotti dal simulatore sono proiezioni basate su ipotesi semplificate e non costituiscono consulenza finanziaria, fiscale o legale. Le performance passate dei mercati finanziari non garantiscono risultati futuri. Prima di prendere decisioni di investimento rilevanti, rivolgiti a un consulente finanziario indipendente e abilitato.
-
----
-
-## Verifica dei calcoli
-
-Il motore di calcolo è stato sottoposto a un audit indipendente in tre fasi:
-
-1. **Verifica analitica** — per i casi senza tasse, i risultati del simulatore sono stati confrontati con la formula chiusa dell'annuity finanziaria: coincidono al centesimo.
-2. **Simmetria cross-dashboard** — il capitale richiesto dalla dashboard Reverse, inserito nella dashboard Direct, restituisce esattamente lo stesso prelievo mensile (e viceversa). Errore massimo riscontrato: < €1 su importi fino a €2.000.000, attribuibile ad arrotondamenti floating point.
-3. **Test di monotonia** — verificato che all'aumentare del rendimento il prelievo sostenibile aumenta, all'aumentare delle tasse diminuisce, e così via per tutte le variabili. Nessuna violazione riscontrata.
-
-Il codice dell'audit è disponibile nel file `audit_v3.py`.
-
----
-
-## Compatibilità
-
-Testato su Chrome, Firefox, Edge e Safari (desktop e mobile).
-Funziona su qualsiasi dispositivo con un browser moderno — nessuna installazione.
