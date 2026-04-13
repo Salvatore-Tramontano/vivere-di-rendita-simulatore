@@ -133,6 +133,9 @@
 
         /* ── Mobile drawer ── */
         @media (max-width: 1023px) {
+            html { overflow: hidden; font-size: 16px; }
+            body { height: 100dvh; }
+            header { position: sticky; top: 0; z-index: 250; flex-shrink: 0; }
             .sidebar-panel {
                 position: fixed; top: 0; left: 0; height: 100dvh;
                 width: min(340px, 92vw);
@@ -237,7 +240,7 @@
         <button id="btn-hamburger" class="btn-sidebar-toggle items-center justify-center w-9 h-9 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-all flex-shrink-0" onclick="toggleSidebar()">
             <i class="fa-solid fa-bars text-sm"></i>
         </button>
-        <i class="fa-solid fa-gem text-lg text-slate-300 flex-shrink-0"></i>
+        <i class="fa-solid fa-gem text-lg text-slate-300 flex-shrink-0 hidden sm:inline"></i>
         <div class="min-w-0">
             <h1 class="text-base md:text-xl font-bold text-white truncate">Vivere di Rendita</h1>
             <p class="text-xs text-slate-500 mt-0.5 hidden md:block">Simula come gestire un grande capitale nel tempo</p>
@@ -1373,6 +1376,8 @@ function totalePrelievi(pmt1, mesi, infM, isCresc) {
 // GRAFICO — Tooltip DOM esterno (sempre visibile, z-index massimo)
 // ──────────────────────────────────────────────────────
 let chartTooltipEl = null;
+let tooltipDismissTimer = null;
+const isTouchDevice = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
 function getChartTooltipEl() {
     if (!chartTooltipEl) {
@@ -1482,9 +1487,15 @@ function externalChartTooltip(context, hexColor, dataStore) {
     const el = getChartTooltipEl();
 
     if (tooltip.opacity === 0) {
-        el.style.opacity = '0';
+        if (isTouchDevice()) {
+            if (tooltipDismissTimer) clearTimeout(tooltipDismissTimer);
+            tooltipDismissTimer = setTimeout(() => { el.style.opacity = '0'; }, 2500);
+        } else {
+            el.style.opacity = '0';
+        }
         return;
     }
+    if (tooltipDismissTimer) { clearTimeout(tooltipDismissTimer); tooltipDismissTimer = null; }
 
     const store = chart.customDataStore || dataStore;
     const dataIndex = tooltip.dataPoints?.[0]?.dataIndex;
