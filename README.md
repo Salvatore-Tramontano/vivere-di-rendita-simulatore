@@ -1,5 +1,9 @@
 # Vivere di Rendita - Il Simulatore
 
+<img width="1916" height="907" alt="3863jl0LrR" src="https://github.com/user-attachments/assets/bf95bb49-c466-40b5-a18a-5c828e7d6491" />
+
+<img width="1920" height="907" alt="0FckIS7o3S" src="https://github.com/user-attachments/assets/3b7d5a80-d303-4c09-aff4-0c5f80a06233" />
+
 Strumento di simulazione per pianificare la gestione di un capitale nel tempo, con calcolo fiscale italiano (ETF ad accumulazione, imposta di bollo e tassazione sulle plusvalenze).
 
 Clicca qui per usarlo --> https://salvatore-tramontano.github.io/vivere-di-rendita-simulatore/
