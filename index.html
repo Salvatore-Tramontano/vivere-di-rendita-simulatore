@@ -1402,6 +1402,15 @@ function getChartTooltipEl() {
             transition: 'opacity 0.15s ease'
         });
         document.body.appendChild(chartTooltipEl);
+
+        document.addEventListener('touchstart', function(e) {
+            if (!isTouchDevice()) return;
+            const onCanvas = Array.from(document.querySelectorAll('canvas')).some(c => c.contains(e.target));
+            if (!onCanvas) {
+                if (tooltipDismissTimer) { clearTimeout(tooltipDismissTimer); tooltipDismissTimer = null; }
+                chartTooltipEl.style.opacity = '0';
+            }
+        }, { passive: true });
     }
     return chartTooltipEl;
 }
