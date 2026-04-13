@@ -2,6 +2,8 @@
 
 Strumento di simulazione per pianificare la gestione di un capitale nel tempo, con calcolo fiscale italiano (ETF ad accumulazione, imposta di bollo e tassazione sulle plusvalenze).
 
+Clicca qui per usarlo --> https://salvatore-tramontano.github.io/vivere-di-rendita-simulatore/
+
 ---
 
 ## Cos'è
